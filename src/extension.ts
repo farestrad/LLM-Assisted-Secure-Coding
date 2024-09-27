@@ -3,27 +3,29 @@ import fetch from 'node-fetch';
 
 export function activate(context: vscode.ExtensionContext) {
     let disposable = vscode.commands.registerCommand('codeLlama.runCodeLlama', async () => {
+        // Create an output channel
+        const outputChannel = vscode.window.createOutputChannel("Code Llama Output");
+
+        // Show the output channel window
+        outputChannel.show(true);
+
         // Get the active text editor
         const editor = vscode.window.activeTextEditor;
 
         if (editor) {
-            /// Get the selected text or provide a default prompt
+            // Get the selected text
             const selection = editor.selection;
             const selectedText = editor.document.getText(selection);
 
-            // Log the selected text to ensure it's correct
-            console.log('Selected Text:', selectedText);
-
-            // Handle case where no text is selected
             if (!selectedText) {
                 vscode.window.showErrorMessage('No text selected. Please select a prompt.');
                 return;
             }
 
-            vscode.window.showInformationMessage('Sending code to Code Llama...');
+            outputChannel.appendLine('Sending code to Code Llama with streaming...');
 
             try {
-                // Call the Code Llama API
+                // Call the Code Llama API with streaming enabled
                 const response = await fetch('http://167.99.179.121:11434/api/generate', {
                     method: 'POST',
                     headers: {
@@ -31,8 +33,8 @@ export function activate(context: vscode.ExtensionContext) {
                     },
                     body: JSON.stringify({
                         model: 'llama3',
-                        prompt: selectedText,  // Ensure selectedText is sent
-                        stream: false,
+                        prompt: selectedText,
+                        stream: true,
                     }),
                 });
 
@@ -40,16 +42,31 @@ export function activate(context: vscode.ExtensionContext) {
                     throw new Error('Failed to fetch response from server');
                 }
 
-                const result = await response.json();
+                // Use Node.js stream API instead of getReader
+                const stream = response.body as unknown as NodeJS.ReadableStream;
 
-            // Extract the 'response' field from the result
-    const outputText = result.response || "No valid response found.";
+                let partialResponse = '';
 
-    // Show the output in an information message
-    vscode.window.showInformationMessage(`Code Llama Output: ${outputText}`);
-} catch (error: any) {
-    vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
-}
+                stream.on('data', (chunk) => {
+                    // Convert chunk to a string and parse it as JSON
+                    const jsonChunk = JSON.parse(chunk.toString());
+                    
+                    // Extract the 'response' field from the JSON (or handle other fields if needed)
+                    const outputText = jsonChunk.response || 'No valid response found';
+
+                    // Append the parsed response to the output channel
+                    partialResponse += outputText;
+                    outputChannel.append(outputText); // Update the output progressively
+                });
+
+                stream.on('end', () => {
+                    // Show the final accumulated response
+                    outputChannel.appendLine('\n\nStreaming complete.');
+                });
+
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
+            }
 
         } else {
             vscode.window.showErrorMessage('No active editor found.');
