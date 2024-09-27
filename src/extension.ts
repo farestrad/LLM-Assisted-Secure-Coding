@@ -7,7 +7,7 @@ export function activate(context: vscode.ExtensionContext) {
         const editor = vscode.window.activeTextEditor;
 
         if (editor) {
-            // Get the selected text or provide a default prompt
+            /// Get the selected text or provide a default prompt
             const selection = editor.selection;
             const selectedText = editor.document.getText(selection);
 
