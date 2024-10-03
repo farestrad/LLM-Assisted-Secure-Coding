@@ -1,7 +1,7 @@
 {
   "name": "code-llama-integration",
   "displayName": "Code Llama Integration",
-  "description": "Integrates Code Llama with VS Code for code analysis and secuirty vulnerability checks.",
+  "description": "Integrates Code Llama with VS Code for code analysis and security vulnerability checks.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.93.0"
@@ -16,14 +16,13 @@
   "contributes": {
     "commands": [
       {
-       "command": "codeLlama.runCodeLlama",
-            "title": "Run Code Llama"
-        
+        "command": "codeLlama.runCodeLlama",
+        "title": "Run Code Llama"
       }
     ]
-  }
-  ,
+  },
   "scripts": {
+    "build": "webpack --mode production", 
     "vscode:prepublish": "npm run package",
     "compile": "webpack",
     "watch": "webpack --watch",
