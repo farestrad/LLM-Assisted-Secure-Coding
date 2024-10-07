@@ -1,4 +1,4 @@
-## steps to Resolve issues
+## Steps to Resolve issues
 - run ```npm install```
 - ```npm install node-fetch@^2```
 - ```npm run compile```
