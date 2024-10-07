@@ -1,3 +1,8 @@
+## steps to Resolve issues
+- run ```npm install```
+- ```npm install node-fetch@^2```
+- ```npm run compile```
+
 # code-llama-integration README
 
 This is the README for your extension "code-llama-integration". After writing up a brief description, we recommend including the following sections.

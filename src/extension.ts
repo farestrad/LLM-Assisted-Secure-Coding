@@ -18,11 +18,11 @@ export function activate(context: vscode.ExtensionContext) {
             const selectedText = editor.document.getText(selection);
 
             if (!selectedText) {
-                vscode.window.showErrorMessage('No text selected. Please select a prompt.');
+                vscode.window.showErrorMessage('Please select the line you want to check.');
                 return;
             }
 
-            outputChannel.appendLine('Sending code to Code Llama with streaming...');
+            outputChannel.appendLine('Checking code for Vulnerabilities...');
 
             try {
                 // Call the Code Llama API with streaming enabled
@@ -39,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to fetch response from server');
+                    throw new Error('Oops our bad.. try again!');
                 }
 
                 // Use Node.js stream API instead of getReader
@@ -61,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
 
                 stream.on('end', () => {
                     // Show the final accumulated response
-                    outputChannel.appendLine('\n\nStreaming complete.');
+                    outputChannel.appendLine('\n\nDone!');
                 });
 
             } catch (error: any) {
