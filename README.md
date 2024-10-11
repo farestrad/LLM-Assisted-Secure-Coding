@@ -39,9 +39,8 @@ everything should be working.
 - ```curl -X POST http://178.128.231.xxx:11434/api/generate -d '{
   "model": "llama3",
   "prompt": "Why is the sky blue?",
-  "stream": true
-}' 
-```
+  "stream": true}'
+  ```
 
 
 
