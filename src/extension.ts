@@ -26,7 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
 
             try {
                 // Call the Code Llama API with streaming enabled
-                const response = await fetch('http://167.99.179.121:11434/api/generate', {
+                const response = await fetch('http://178.128.231.154:11434/api/generate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
