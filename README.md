@@ -36,11 +36,13 @@ You would need to ensure you copy the ipv4 address from your digital ocean dashb
 everything should be working.
 
 ## Test
-- ```curl -X POST http://178.128.231.xxx:11434/api/generate -d '{
+- ```
+curl -X POST http://178.128.231.xxx:11434/api/generate -d '{
   "model": "llama3",
   "prompt": "Why is the sky blue?",
   "stream": true
-}' ```
+}' 
+```
 
 
 
