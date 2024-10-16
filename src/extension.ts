@@ -1,7 +1,14 @@
 import * as vscode from 'vscode';
 import fetch from 'node-fetch';
+import { GeneratedCodeProvider } from './generatedCodeProvider';
 
 export function activate(context: vscode.ExtensionContext) {
+    // Create an instance of GeneratedCodeProvider to manage sidebar data
+    const generatedCodeProvider = new GeneratedCodeProvider();
+    
+    // Register the provider with the view ID from package.json
+    vscode.window.registerTreeDataProvider('codeLlamaGeneratedCodeView', generatedCodeProvider);
+
     let disposable = vscode.commands.registerCommand('codeLlama.runCodeLlama', async () => {
         // Create an output channel
         const outputChannel = vscode.window.createOutputChannel("Code Llama Output");
@@ -22,7 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            outputChannel.appendLine('Checking code for Vulnerabilities...');
+            outputChannel.appendLine('Generating code with Code Llama...');
 
             try {
                 // Call the Code Llama API with streaming enabled
@@ -34,38 +41,39 @@ export function activate(context: vscode.ExtensionContext) {
                     body: JSON.stringify({
                         model: 'llama3',
                         prompt: selectedText,
-                        stream: true,
+                        stream: true,  // Streaming enabled
                     }),
                 });
 
                 if (!response.ok) {
-                    throw new Error('Oops our bad.. try again!');
+                    throw new Error('Error generating code. Please try again.');
                 }
 
-                // Use Node.js stream API instead of getReader
+                // Use Node.js stream API to handle streaming
                 const stream = response.body as unknown as NodeJS.ReadableStream;
-
                 let partialResponse = '';
 
                 stream.on('data', (chunk) => {
                     // Convert chunk to a string and parse it as JSON
                     const jsonChunk = JSON.parse(chunk.toString());
-                    
-                    // Extract the 'response' field from the JSON (or handle other fields if needed)
+
+                    // Extract the 'response' field from the JSON
                     const outputText = jsonChunk.response || 'No valid response found';
 
-                    // Append the parsed response to the output channel
+                    // Append the streamed output progressively to the output channel
                     partialResponse += outputText;
-                    outputChannel.append(outputText); // Update the output progressively
+                    outputChannel.append(outputText);  // Update output channel
+
+                    // Update the sidebar with the partial response
+                    generatedCodeProvider.updateGeneratedCode(partialResponse);  // Update sidebar progressively
                 });
 
                 stream.on('end', () => {
-                    // Show the final accumulated response
-                    outputChannel.appendLine('\n\nDone!');
+                    outputChannel.appendLine('\n\nCode generation complete.');
                 });
 
             } catch (error: any) {
-                vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
+                vscode.window.showErrorMessage(`Error: ${error.message}`);
             }
 
         } else {

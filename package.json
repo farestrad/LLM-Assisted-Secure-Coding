@@ -10,7 +10,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:codeLlama.runCodeLlama"
+    "onCommand:codeLlama.runCodeLlama",
+    "onCommand:codeLlama.generateCode"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -18,8 +19,20 @@
       {
         "command": "codeLlama.runCodeLlama",
         "title": "Run Code Llama"
+      },
+      {
+        "command": "codeLlama.generateCode", 
+        "title": "Generate Code with Code Llama"
       }
-    ]
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "codeLlamaGeneratedCodeView",
+          "name": "Code Llama Generated Code"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "webpack --mode production",
@@ -31,7 +44,8 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "clean": "rm -rf dist"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.7",
