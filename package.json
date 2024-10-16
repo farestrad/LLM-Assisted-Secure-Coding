@@ -27,7 +27,20 @@
       {
         "command": "extension.copyToClipboard",
         "title": "Copy Generated Code to Clipboard"
+      },
+      {
+        "command": "extension.undoAISuggestion",
+        "title": "Undo AI Suggestion"
+      },
+      {
+        "command": "extension.acceptAISuggestion",
+        "title": "Accept AI Suggestion"
+      },
+      {
+        "command": "extension.rejectAISuggestion",
+        "title": "Reject AI Suggestion"
       }
+
     ],
     "views": {
       "explorer": [
@@ -38,6 +51,10 @@
         {
           "id": "securityAnalysisView",
           "name": "Security Analysis"
+        },
+        {
+          "id": "aiSuggestionHistoryView",
+          "name": "AI Suggestions History"  
         }
       ]
     }

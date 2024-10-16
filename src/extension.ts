@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import fetch from 'node-fetch';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
 import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
+import { AISuggestionHistoryProvider } from './AISuggestionHistoryProvider';
+
 
 export function activate(context: vscode.ExtensionContext) {
     // Create an instance of GeneratedCodeProvider to manage sidebar data
@@ -13,6 +15,10 @@ export function activate(context: vscode.ExtensionContext) {
     // Security Analysis output
     const securityAnalysisProvider = new SecurityAnalysisProvider();  // Create the provider
     vscode.window.registerTreeDataProvider('securityAnalysisView', securityAnalysisProvider);  // Register the view
+
+    const aiSuggestionHistoryProvider = new AISuggestionHistoryProvider();
+    vscode.window.registerTreeDataProvider('aiSuggestionHistoryView', aiSuggestionHistoryProvider);
+
 
     vscode.commands.registerCommand('extension.runSecurityAnalysis', () => {
         // For now, we'll simulate security issues with mock data
@@ -94,6 +100,11 @@ export function activate(context: vscode.ExtensionContext) {
                         // Handle the "done" field (final chunk)
                         if (jsonChunk.done) {
                             outputChannel.appendLine('\n\nCode generation complete.');
+                          
+                          //log ai sugesstions
+                            aiSuggestionHistoryProvider.addAISuggestion(partialResponse, selectedText);
+                       
+
                         }
                         
                     } catch (error) {
