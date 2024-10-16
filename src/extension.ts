@@ -54,19 +54,22 @@ export function activate(context: vscode.ExtensionContext) {
                 let partialResponse = '';
 
                 stream.on('data', (chunk) => {
-                    // Convert chunk to a string and parse it as JSON
                     const jsonChunk = JSON.parse(chunk.toString());
-
-                    // Extract the 'response' field from the JSON
-                    const outputText = jsonChunk.response || 'No valid response found';
-
-                    // Append the streamed output progressively to the output channel
-                    partialResponse += outputText;
-                    outputChannel.append(outputText);  // Update output channel
-
-                    // Update the sidebar with the partial response
-                    generatedCodeProvider.updateGeneratedCode(partialResponse);  // Update sidebar progressively
+                
+                    if (jsonChunk.response) {
+                        const outputText = jsonChunk.response;
+                        partialResponse += outputText;
+                
+                        // Update the output channel
+                        outputChannel.append(outputText);
+                
+                        // Update the sidebar with syntax-highlighted code (e.g., 'python')
+                        generatedCodeProvider.updateGeneratedCode(partialResponse, 'python');  // Adjust language as needed
+                    } else {
+                        outputChannel.appendLine('Unexpected response format');
+                    }
                 });
+                
 
                 stream.on('end', () => {
                     outputChannel.appendLine('\n\nCode generation complete.');
@@ -84,4 +87,11 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(disposable);
 }
 
+vscode.commands.registerCommand('extension.copyToClipboard', (code: string) => {
+    vscode.env.clipboard.writeText(code);
+    vscode.window.showInformationMessage('Code copied to clipboard!');
+});
+
+
 export function deactivate() {}
+ 
