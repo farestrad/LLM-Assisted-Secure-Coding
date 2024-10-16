@@ -11,7 +11,7 @@ export class GeneratedCodeProvider implements vscode.TreeDataProvider<vscode.Tre
         this._onDidChangeTreeData.fire();
     }
 
-    // Update the sidebar with formatted code
+    // Update the sidebar with the formatted code 
     updateGeneratedCode(code: string, language: string = 'plaintext'): void {
         const markdownCode = new vscode.MarkdownString();
         markdownCode.appendCodeblock(code, language);  // Syntax highlighting for tooltip
@@ -34,7 +34,7 @@ export class GeneratedCodeProvider implements vscode.TreeDataProvider<vscode.Tre
         };
     
         this.generatedCode = [treeItem];  // Update with new TreeItem
-        this.refresh();  // Refresh the TreeView
+        this.refresh();  // Refresh the TreeView fir new requests
     }
     
 
