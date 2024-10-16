@@ -54,19 +54,34 @@ export function activate(context: vscode.ExtensionContext) {
                 let partialResponse = '';
 
                 stream.on('data', (chunk) => {
-                    const jsonChunk = JSON.parse(chunk.toString());
+                    try {
+                        // Attempt to parse the chunk as JSON
+                        const jsonChunk = JSON.parse(chunk.toString());
                 
-                    if (jsonChunk.response) {
-                        const outputText = jsonChunk.response;
-                        partialResponse += outputText;
+                        // Debugging: Log the structure of the chunk to better understand the response
+                        console.log('Received chunk:', jsonChunk);
+                     /*   outputChannel.appendLine(`Received chunk: ${JSON.stringify(jsonChunk, null, 2)}`);
+                        ONLY UNCOMMENT THIS LINE IF YOU WANT A DETAILED LOG (WITH FIELDS) OF THE CODE LLAMA RESPONSE */
+                        // Check if the expected field is present
+                        if (jsonChunk.response && jsonChunk.response !== "") {
+                            const outputText = jsonChunk.response;
+                            partialResponse += outputText;
                 
-                        // Update the output channel
-                        outputChannel.append(outputText);
+                            // Update the output channel
+                            outputChannel.append(outputText);
                 
-                        // Update the sidebar with syntax-highlighted code (e.g., 'python')
-                        generatedCodeProvider.updateGeneratedCode(partialResponse, 'python');  // Adjust language as needed
-                    } else {
-                        outputChannel.appendLine('Unexpected response format');
+                            // Update the sidebar with syntax-highlighted code (for example, 'java')
+                            generatedCodeProvider.updateGeneratedCode(partialResponse, 'java');
+                        }
+                
+                        // Handle the "done" field (final chunk)
+                        if (jsonChunk.done) {
+                            outputChannel.appendLine('\n\nCode generation complete.');
+                        }
+                        
+                    } catch (error) {
+                        const err = error as Error;  // Cast 'error' to 'Error' type
+                        outputChannel.appendLine(`Error parsing response: ${err.message}`);
                     }
                 });
                 
