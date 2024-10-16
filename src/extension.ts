@@ -18,7 +18,8 @@ export function activate(context: vscode.ExtensionContext) {
         // For now, we'll simulate security issues with mock data
         const mockSecurityIssues = [
             "Potential SQL Injection - Line 15",
-            "Insecure password storage - Line 24"
+            "Insecure password storage - Line 24",
+            "Hard Coring - Line 34"
         ];
 
         securityAnalysisProvider.updateSecurityAnalysis(mockSecurityIssues);
