@@ -34,6 +34,10 @@
         {
           "id": "codeLlamaGeneratedCodeView",
           "name": "Code Llama Generated Code"
+        },
+        {
+          "id": "securityAnalysisView",
+          "name": "Security Analysis"
         }
       ]
     }

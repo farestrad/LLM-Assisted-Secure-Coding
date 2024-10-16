@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import fetch from 'node-fetch';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
+import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
 
 export function activate(context: vscode.ExtensionContext) {
     // Create an instance of GeneratedCodeProvider to manage sidebar data
@@ -8,6 +9,21 @@ export function activate(context: vscode.ExtensionContext) {
     
     // Register the provider with the view ID from package.json
     vscode.window.registerTreeDataProvider('codeLlamaGeneratedCodeView', generatedCodeProvider);
+
+    // Security Analysis output
+    const securityAnalysisProvider = new SecurityAnalysisProvider();  // Create the provider
+    vscode.window.registerTreeDataProvider('securityAnalysisView', securityAnalysisProvider);  // Register the view
+
+    vscode.commands.registerCommand('extension.runSecurityAnalysis', () => {
+        // For now, we'll simulate security issues with mock data
+        const mockSecurityIssues = [
+            "Potential SQL Injection - Line 15",
+            "Insecure password storage - Line 24"
+        ];
+
+        securityAnalysisProvider.updateSecurityAnalysis(mockSecurityIssues);
+        vscode.window.showInformationMessage('Security analysis completed.');
+    });
 
     let disposable = vscode.commands.registerCommand('codeLlama.runCodeLlama', async () => {
         // Create an output channel
