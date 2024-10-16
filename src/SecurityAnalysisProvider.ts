@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+//this class is for the secuirty panel
 export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     // Event emitter to signal changes in the tree data
@@ -32,7 +33,7 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         if (this.securityIssues.length > 0) {
             return this.securityIssues;
         } else {
-            return [new vscode.TreeItem("No security issues found")];
+            return [new vscode.TreeItem("No security issues found!")];
         }
     }
 }
