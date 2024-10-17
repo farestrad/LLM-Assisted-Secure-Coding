@@ -4,7 +4,6 @@ import { GeneratedCodeProvider } from './generatedCodeProvider';
 import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
 import { AISuggestionHistoryProvider } from './AISuggestionHistoryProvider';
 
-
 export function activate(context: vscode.ExtensionContext) {
     // Create an instance of GeneratedCodeProvider to manage sidebar data
     const generatedCodeProvider = new GeneratedCodeProvider();
@@ -101,10 +100,8 @@ export function activate(context: vscode.ExtensionContext) {
                         if (jsonChunk.done) {
                             outputChannel.appendLine('\n\nCode generation complete.');
                           
-                          //log ai sugesstions
+                            // Log AI suggestions
                             aiSuggestionHistoryProvider.addAISuggestion(partialResponse, selectedText);
-                       
-
                         }
                         
                     } catch (error) {
@@ -128,13 +125,42 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(disposable);
-}
 
+
+// Copy to clipboard command (same as before)
 vscode.commands.registerCommand('extension.copyToClipboard', (code: string) => {
     vscode.env.clipboard.writeText(code);
     vscode.window.showInformationMessage('Code copied to clipboard!');
 });
 
+// Commands for accepting, rejecting, and undoing AI suggestions
+vscode.commands.registerCommand('extension.acceptAISuggestion', (id: string) => {
+    const suggestionId = parseInt(id, 10);
+    aiSuggestionHistoryProvider.updateAISuggestionStatus(suggestionId, 'accepted');  // Use the instance, not the class
+    vscode.window.showInformationMessage('AI suggestion accepted.');
+});
 
+vscode.commands.registerCommand('extension.rejectAISuggestion', (id: string) => {
+    const suggestionId = parseInt(id, 10);
+    aiSuggestionHistoryProvider.updateAISuggestionStatus(suggestionId, 'rejected');  // Use the instance, not the class
+    vscode.window.showInformationMessage('AI suggestion rejected.');
+});
+
+vscode.commands.registerCommand('extension.undoAISuggestion', (id: string) => {
+    const suggestionId = parseInt(id, 10);
+    const originalCode = aiSuggestionHistoryProvider.undoAISuggestion(suggestionId);  // Use the instance, not the class
+
+    if (originalCode && vscode.window.activeTextEditor) {
+        const editor = vscode.window.activeTextEditor;
+        editor.edit(editBuilder => {
+            editBuilder.replace(editor.selection, originalCode);  // Replace with original code
+        });
+        vscode.window.showInformationMessage('Undo successful.');
+    } else {
+        vscode.window.showErrorMessage('Unable to undo the suggestion.');
+    }
+});
+}
 export function deactivate() {}
+
  
