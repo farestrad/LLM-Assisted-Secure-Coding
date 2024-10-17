@@ -23,7 +23,7 @@
         "title": "Run Code Llama"
       },
       {
-        "command": "codeLlama.generateCode", 
+        "command": "codeLlama.generateCode",
         "title": "Generate Code with Code Llama"
       },
       {
@@ -42,8 +42,21 @@
         "command": "extension.rejectAISuggestion",
         "title": "Reject AI Suggestion"
       }
-
     ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "extension.acceptAISuggestion",
+          "when": "view == aiSuggestionHistoryView && aiSuggestion == 'pending'",
+          "group": "inline"
+        },
+        {
+          "command": "extension.rejectAISuggestion",
+          "when": "view == aiSuggestionHistoryView && aiSuggestion == 'pending'",
+          "group": "inline"
+        }
+      ]
+    },
     "views": {
       "explorer": [
         {
@@ -56,7 +69,7 @@
         },
         {
           "id": "aiSuggestionHistoryView",
-          "name": "AI Suggestions History"  
+          "name": "AI Suggestions History"
         }
       ]
     }

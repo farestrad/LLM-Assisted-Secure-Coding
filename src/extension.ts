@@ -131,32 +131,46 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Commands for accepting, rejecting, and undoing AI suggestions
-    vscode.commands.registerCommand('extension.acceptAISuggestion', (element: AISuggestion) => {
-        const id = aiSuggestionHistoryProvider.getChildren().indexOf(element);
+
+vscode.commands.registerCommand('extension.acceptAISuggestion', async (element: AISuggestion) => {
+    const suggestions = await aiSuggestionHistoryProvider.getChildren();  // Get the list of suggestions
+    const id = suggestions ? suggestions.indexOf(element) : -1;  // Find the index of the element
+    if (id >= 0) {
         aiSuggestionHistoryProvider.updateAISuggestionStatus(id, 'accepted');
         vscode.window.showInformationMessage('AI suggestion accepted.');
-    });
+    } else {
+        vscode.window.showErrorMessage('AI suggestion not found.');
+    }
+});
 
-    vscode.commands.registerCommand('extension.rejectAISuggestion', (element: AISuggestion) => {
-        const id = aiSuggestionHistoryProvider.getChildren().indexOf(element);
+
+// Register the Reject AI Suggestion command
+vscode.commands.registerCommand('extension.rejectAISuggestion', async (element: AISuggestion) => {
+    const suggestions = await aiSuggestionHistoryProvider.getChildren();  // Get the list of suggestions
+    const id = suggestions ? suggestions.indexOf(element) : -1;  // Find the index of the element
+    if (id >= 0) {
         aiSuggestionHistoryProvider.updateAISuggestionStatus(id, 'rejected');
         vscode.window.showInformationMessage('AI suggestion rejected.');
-    });
+    } else {
+        vscode.window.showErrorMessage('AI suggestion not found.');
+    }
+});
 
-    vscode.commands.registerCommand('extension.undoAISuggestion', (element: AISuggestion) => {
-        const id = aiSuggestionHistoryProvider.getChildren().indexOf(element);
-        const originalCode = aiSuggestionHistoryProvider.undoAISuggestion(id);
+vscode.commands.registerCommand('extension.toggleSuggestionStatus', (element: AISuggestion) => {
+    // Toggle between 'accepted' and 'rejected'
+    if (element.status === 'pending' || element.status === 'rejected') {
+        element.status = 'accepted';
+        vscode.window.showInformationMessage(`AI suggestion accepted.`);
+    } else {
+        element.status = 'rejected';
+        vscode.window.showInformationMessage(`AI suggestion rejected.`);
+    }
 
-        if (originalCode && vscode.window.activeTextEditor) {
-            const editor = vscode.window.activeTextEditor;
-            editor.edit(editBuilder => {
-                editBuilder.replace(editor.selection, originalCode);  // Replace with original code
-            });
-            vscode.window.showInformationMessage('Undo successful.');
-        } else {
-            vscode.window.showErrorMessage('Unable to undo the suggestion.');
-        }
-    });
+    aiSuggestionHistoryProvider.refresh();  // Refresh the TreeView to update the status
+});
+
+
+
 }
 
 export function deactivate() {}
