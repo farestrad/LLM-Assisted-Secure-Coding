@@ -11,7 +11,9 @@
   ],
   "activationEvents": [
     "onCommand:codeLlama.runCodeLlama",
-    "onCommand:codeLlama.generateCode"
+    "onCommand:codeLlama.generateCode",
+    "onCommand:extension.acceptAISuggestion",
+    "onCommand:extension.rejectAISuggestion"
   ],
   "main": "./dist/extension.js",
   "contributes": {

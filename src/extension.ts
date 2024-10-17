@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import fetch from 'node-fetch';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
 import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
-import { AISuggestionHistoryProvider } from './AISuggestionHistoryProvider';
+import { AISuggestionHistoryProvider, AISuggestion } from './AISuggestionHistoryProvider';  // Import AISuggestion
 
 export function activate(context: vscode.ExtensionContext) {
     // Create an instance of GeneratedCodeProvider to manage sidebar data
@@ -17,7 +17,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     const aiSuggestionHistoryProvider = new AISuggestionHistoryProvider();
     vscode.window.registerTreeDataProvider('aiSuggestionHistoryView', aiSuggestionHistoryProvider);
-
 
     vscode.commands.registerCommand('extension.runSecurityAnalysis', () => {
         // For now, we'll simulate security issues with mock data
@@ -82,8 +81,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
                         // Debugging: Log the structure of the chunk to better understand the response
                         console.log('Received chunk:', jsonChunk);
-                     /*   outputChannel.appendLine(`Received chunk: ${JSON.stringify(jsonChunk, null, 2)}`);
-                        ONLY UNCOMMENT THIS LINE IF YOU WANT A DETAILED LOG (WITH FIELDS) OF THE CODE LLAMA RESPONSE */
+
                         // Check if the expected field is present
                         if (jsonChunk.response && jsonChunk.response !== "") {
                             const outputText = jsonChunk.response;
@@ -126,41 +124,42 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(disposable);
 
+    // Copy to clipboard command (same as before)
+    vscode.commands.registerCommand('extension.copyToClipboard', (code: string) => {
+        vscode.env.clipboard.writeText(code);
+        vscode.window.showInformationMessage('Code copied to clipboard!');
+    });
 
-// Copy to clipboard command (same as before)
-vscode.commands.registerCommand('extension.copyToClipboard', (code: string) => {
-    vscode.env.clipboard.writeText(code);
-    vscode.window.showInformationMessage('Code copied to clipboard!');
-});
+    // Commands for accepting, rejecting, and undoing AI suggestions
+    vscode.commands.registerCommand('extension.acceptAISuggestion', (element: AISuggestion) => {
+        const id = aiSuggestionHistoryProvider.getChildren().indexOf(element);
+        aiSuggestionHistoryProvider.updateAISuggestionStatus(id, 'accepted');
+        vscode.window.showInformationMessage('AI suggestion accepted.');
+    });
 
-// Commands for accepting, rejecting, and undoing AI suggestions
-vscode.commands.registerCommand('extension.acceptAISuggestion', (id: string) => {
-    const suggestionId = parseInt(id, 10);
-    aiSuggestionHistoryProvider.updateAISuggestionStatus(suggestionId, 'accepted');  // Use the instance, not the class
-    vscode.window.showInformationMessage('AI suggestion accepted.');
-});
+    vscode.commands.registerCommand('extension.rejectAISuggestion', (element: AISuggestion) => {
+        const id = aiSuggestionHistoryProvider.getChildren().indexOf(element);
+        aiSuggestionHistoryProvider.updateAISuggestionStatus(id, 'rejected');
+        vscode.window.showInformationMessage('AI suggestion rejected.');
+    });
 
-vscode.commands.registerCommand('extension.rejectAISuggestion', (id: string) => {
-    const suggestionId = parseInt(id, 10);
-    aiSuggestionHistoryProvider.updateAISuggestionStatus(suggestionId, 'rejected');  // Use the instance, not the class
-    vscode.window.showInformationMessage('AI suggestion rejected.');
-});
+    vscode.commands.registerCommand('extension.undoAISuggestion', (element: AISuggestion) => {
+        const id = aiSuggestionHistoryProvider.getChildren().indexOf(element);
+        const originalCode = aiSuggestionHistoryProvider.undoAISuggestion(id);
 
-vscode.commands.registerCommand('extension.undoAISuggestion', (id: string) => {
-    const suggestionId = parseInt(id, 10);
-    const originalCode = aiSuggestionHistoryProvider.undoAISuggestion(suggestionId);  // Use the instance, not the class
-
-    if (originalCode && vscode.window.activeTextEditor) {
-        const editor = vscode.window.activeTextEditor;
-        editor.edit(editBuilder => {
-            editBuilder.replace(editor.selection, originalCode);  // Replace with original code
-        });
-        vscode.window.showInformationMessage('Undo successful.');
-    } else {
-        vscode.window.showErrorMessage('Unable to undo the suggestion.');
-    }
-});
+        if (originalCode && vscode.window.activeTextEditor) {
+            const editor = vscode.window.activeTextEditor;
+            editor.edit(editBuilder => {
+                editBuilder.replace(editor.selection, originalCode);  // Replace with original code
+            });
+            vscode.window.showInformationMessage('Undo successful.');
+        } else {
+            vscode.window.showErrorMessage('Unable to undo the suggestion.');
+        }
+    });
 }
+
 export function deactivate() {}
+
 
  
