@@ -13,7 +13,10 @@
     "onCommand:codeLlama.runCodeLlama",
     "onCommand:codeLlama.generateCode",
     "onCommand:extension.acceptAISuggestion",
-    "onCommand:extension.rejectAISuggestion"
+    "onCommand:extension.rejectAISuggestion",
+    "onCommand:extension.triggerAISuggestion",
+    "onCommand:extension.acceptCodeChanges",
+    "onCommand:extension.toggleAssistantSidebar"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -41,6 +44,35 @@
       {
         "command": "extension.rejectAISuggestion",
         "title": "Reject AI Suggestion"
+      },
+      {
+        "command": "extension.triggerAISuggestion",
+        "title": "Trigger AI Suggestion"
+      },
+      {
+        "command": "extension.acceptCodeChanges",
+        "title": "Accept Code Changes"
+      },
+      {
+        "command": "extension.toggleAssistantSidebar",
+        "title": "Toggle Assistant Sidebar"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "extension.triggerAISuggestion",
+        "key": "ctrl+alt+s",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.acceptCodeChanges",
+        "key": "ctrl+alt+a",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.toggleAssistantSidebar",
+        "key": "ctrl+alt+d",
+        "when": "editorTextFocus"
       }
     ],
     "menus": {
