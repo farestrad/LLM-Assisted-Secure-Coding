@@ -3,6 +3,9 @@
 - ```npm install node-fetch@^2```
 - ```npm run compile```
 
+## Updates and fetches latest commit
+- ```git fetch origin```
+- ```git reset --hard origin/main```
 
 ## Steps to Deploying the server
 - go to https://www.digitalocean.com and scroll down till you see Sign up and get $200 in credit for your first 60 days with DigitalOcean.* click the button and sign up this gives you a $200 credit
