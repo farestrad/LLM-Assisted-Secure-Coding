@@ -61,9 +61,9 @@ export function activate(context: vscode.ExtensionContext) {
                     },
                     body: JSON.stringify({
                         model: 'llama3',
-                        prompt: selectedText,
+                        prompt: `From the above code, provide a vulnerability analysis with vulnerability rating based on the CVSS model and provide the vulnerability type, reasoning for the vulnerability, vulnerability severity, and proposal for fixing. ${selectedText}`,
                         stream: true,  // Streaming enabled
-                    }),
+                    }),                    
                 });
 
                 if (!response.ok) {
@@ -96,7 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
                         // Handle the "done" field (final chunk)
                         if (jsonChunk.done) {
-                            outputChannel.appendLine('\n\nCode generation complete.');
+                            // outputChannel.appendLine('\n\nCode generation complete.');
                           
                             // Log AI suggestions
                             aiSuggestionHistoryProvider.addAISuggestion(partialResponse, selectedText);
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
 
                 stream.on('end', () => {
-                    outputChannel.appendLine('\n\nCode generation complete.');
+                    outputChannel.appendLine('\n\nVulnerability Assessment Complete.');
                 });
 
             } catch (error: any) {
