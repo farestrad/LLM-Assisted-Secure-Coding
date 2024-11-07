@@ -11,6 +11,7 @@
   ],
   "activationEvents": [
     "onCommand:codeLlama.runCodeLlama",
+    "onCommand:extension.runSecurityAnalysis",
     "onCommand:codeLlama.generateCode",
     "onCommand:extension.acceptAISuggestion",
     "onCommand:extension.rejectAISuggestion",

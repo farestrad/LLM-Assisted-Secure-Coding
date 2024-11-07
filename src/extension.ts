@@ -61,7 +61,7 @@ export function activate(context: vscode.ExtensionContext) {
                     },
                     body: JSON.stringify({
                         model: 'llama3',
-                        prompt: `From the above code, provide a vulnerability analysis with vulnerability rating based on the CVSS model and provide the vulnerability type, reasoning for the vulnerability, vulnerability severity, and proposal for fixing. ${selectedText}`,
+                        prompt: selectedText,
                         stream: true,  // Streaming enabled
                     }),                    
                 });
