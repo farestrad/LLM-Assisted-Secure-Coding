@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
 import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
 import { AISuggestionHistoryProvider, AISuggestion } from './AISuggestionHistoryProvider';  // Import AISuggestion
+import { runCTests } from './testers/cTester';
 
 export function activate(context: vscode.ExtensionContext) {
     // Create an instance of GeneratedCodeProvider to manage sidebar data

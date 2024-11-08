@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
+import { runCTests } from './testers/cTester';
+import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';
 
 export class GeneratedCodeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
 
     private generatedCode: vscode.TreeItem[] = [];
+    //constructor(private securityAnalysisProvider: SecurityAnalysisProvider) {}
 
     // Refresh the view
     refresh(): void {

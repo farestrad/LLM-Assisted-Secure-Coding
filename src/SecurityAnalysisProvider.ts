@@ -1,23 +1,24 @@
 import * as vscode from 'vscode';
 
-//this class is for the secuirty panel
+// This class is for the Security Analysis panel
 export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-
     // Event emitter to signal changes in the tree data
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
 
-    // Placeholder for security analysis results
-    private securityIssues: vscode.TreeItem[] = [];
+    // Placeholder for security analysis results, initialized with a hardcoded issue
+    private securityIssues: vscode.TreeItem[] = [
+        new vscode.TreeItem("Hardcoded issue: Potential buffer overflow detected.")
+    ];
 
     // Method to refresh the view (e.g., after performing analysis)
     refresh(): void {
         this._onDidChangeTreeData.fire();
     }
 
-    // Method to update the security analysis results (this will be extended later)
+    // Method to update the security analysis results
     updateSecurityAnalysis(issues: string[]): void {
-        // For now, we just convert the list of issues into TreeItems
+        // Convert the list of issues into TreeItems
         this.securityIssues = issues.map(issue => new vscode.TreeItem(issue));
         this.refresh();
     }
@@ -27,7 +28,7 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         return element;
     }
 
-    // Method to get the children of a TreeItem (in this case, the list of issues)
+    // Method to get the list of children items (security issues)
     getChildren(): vscode.TreeItem[] {
         // Return security issues if any, or a message indicating no issues found
         if (this.securityIssues.length > 0) {

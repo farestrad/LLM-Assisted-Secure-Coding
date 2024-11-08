@@ -12,6 +12,7 @@
   "activationEvents": [
     "onCommand:codeLlama.runCodeLlama",
     "onCommand:extension.runSecurityAnalysis",
+    "onCommand:extension.testSecurityAnalysis",
     "onCommand:codeLlama.generateCode",
     "onCommand:extension.acceptAISuggestion",
     "onCommand:extension.rejectAISuggestion",
@@ -57,7 +58,12 @@
       {
         "command": "extension.toggleAssistantSidebar",
         "title": "Toggle Assistant Sidebar"
+      },
+      {
+        "command": "extension.testSecurityAnalysis",
+        "title": "Test Security Analysis Panel"
       }
+      
     ],
     "keybindings": [
       {
