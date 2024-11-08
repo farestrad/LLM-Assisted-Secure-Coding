@@ -22,7 +22,6 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
 
     // Method to run security analysis on the latest generated code
     async analyzeLatestGeneratedCode(): Promise<void> {
-        // Get the latest generated code directly as a string
         const code = this.generatedCodeProvider.getLatestGeneratedCode();
 
         if (code) {
@@ -38,6 +37,15 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
             const item = new vscode.TreeItem(issue);
             item.iconPath = new vscode.ThemeIcon("warning");
             item.tooltip = `Security issue detected: ${issue}`;
+            item.description = 'Click to copy'; // Add description to prompt the user
+
+            // Command to copy the issue text to clipboard
+            item.command = {
+                command: 'extension.copyToClipboard', // Assumes this command is registered in extension.ts
+                title: 'Copy Code',
+                arguments: [issue], // Pass the issue text as the argument
+            };
+
             return item;
         });
         this.refresh();

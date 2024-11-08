@@ -18,7 +18,9 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
         return;
     }
 
+    
     // Wrap the generated code with a main function for testing
+    /*
     const testCode = `
 #include <stdio.h>
 #include <assert.h>
@@ -28,6 +30,10 @@ ${code}
 int main() {
     return 0;
 }
+`;
+*/
+const testCode = `
+${code}
 `;
 
     try {
