@@ -111,7 +111,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
 
                 stream.on('end', () => {
-                    outputChannel.appendLine('\n\nCode Generstion Completed.');
+                    outputChannel.appendLine('\n\nCode Generation Completed.');
                 });
 
             } catch (error: any) {

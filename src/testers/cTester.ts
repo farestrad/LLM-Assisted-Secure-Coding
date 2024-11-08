@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import { exec } from 'child_process';
 import * as vscode from 'vscode';
 
-// Function to handle C code testing
 export async function runCTests(code: string, securityAnalysisProvider: any) {
     // Check if there's an open workspace folder
     if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
@@ -13,25 +12,22 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
     // Define the file path based on the first workspace folder
     const tempFilePath = vscode.workspace.workspaceFolders[0].uri.fsPath + '/temp_test_code.c';
 
-    // Wrap the generated code with unit tests
+    // Security checks
+    const securityIssues = analyzeCodeForSecurityIssues(code);
+    if (securityIssues.length > 0) {
+        securityAnalysisProvider.updateSecurityAnalysis(securityIssues);
+        return; // Stop here if there are security issues
+    }
+
+    // Wrap the generated code with a main function for testing
     const testCode = `
 #include <stdio.h>
 #include <assert.h>
 
-// Generated code
 ${code}
 
-// Unit test function
-void run_tests() {
-    // Example assertions (replace with real test cases)
-    assert(your_function(1) == expected_result);
-    printf("Test passed.\\n");
-    assert(your_function(2) == another_expected_result);
-    printf("All tests passed!\\n");
-}
-
 int main() {
-    run_tests();
+    // Test code runs here (add tests if needed)
     return 0;
 }
 `;
@@ -52,4 +48,36 @@ int main() {
             securityAnalysisProvider.updateSecurityAnalysis([results.trim()]);
         });
     });
+}
+
+// Analyze code for buffer overflow risks and other security issues
+function analyzeCodeForSecurityIssues(code: string): string[] {
+    const issues = [];
+
+    // Check for risky functions
+    const riskyFunctions = ['strcpy', 'gets', 'sprintf'];
+    riskyFunctions.forEach(func => {
+        const regex = new RegExp(`\\b${func}\\b`);
+        if (regex.test(code)) {
+            issues.push(`Warning: Use of ${func} detected. Consider using safer alternatives (e.g., strncpy, fgets, snprintf).`);
+        }
+    });
+
+    // Check for buffers without bounds checking
+    const bufferRegex = /\bchar\s+\w+\[(\d+)\];/g;
+    let match;
+    while ((match = bufferRegex.exec(code)) !== null) {
+        const bufferName = match[0];
+        const bufferDeclaration = match[0];
+        if (!new RegExp(`sizeof\\(${bufferName}\\)`).test(code)) {
+            issues.push(`Warning: Buffer ${bufferDeclaration} does not include bounds checking. Use sizeof(${bufferName}) to prevent overflow.`);
+        }
+    }
+
+    // Check for safer memory allocation (optional)
+    if (!/\b(malloc|calloc)\b/.test(code) && /\bchar\s+\w+\[\d+\];/.test(code)) {
+        issues.push("Consider using dynamic memory allocation (malloc or calloc) for buffers to handle variable input sizes.");
+    }
+
+    return issues;
 }
