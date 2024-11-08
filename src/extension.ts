@@ -61,10 +61,11 @@ export function activate(context: vscode.ExtensionContext) {
                     },
                     body: JSON.stringify({
                         model: 'llama3',
-                        prompt: selectedText,
+                        prompt: `Only provide the C code with no additional explanation, comments, or extra text at all, and do not write the letter c on top or anywhere else. Write the C code to accomplish the following task: ${selectedText}`,
                         stream: true,  // Streaming enabled
-                    }),                    
+                    }),
                 });
+                
 
                 if (!response.ok) {
                     throw new Error('Error generating code. Please try again.');
@@ -110,7 +111,7 @@ export function activate(context: vscode.ExtensionContext) {
                 
 
                 stream.on('end', () => {
-                    outputChannel.appendLine('\n\nVulnerability Assessment Complete.');
+                    outputChannel.appendLine('\n\nCode Generstion Completed.');
                 });
 
             } catch (error: any) {
