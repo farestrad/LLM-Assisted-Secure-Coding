@@ -7,6 +7,7 @@ export class GeneratedCodeProvider implements vscode.TreeDataProvider<vscode.Tre
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
 
     private generatedCode: vscode.TreeItem[] = [];
+    private latestCode: string = '';
     //constructor(private securityAnalysisProvider: SecurityAnalysisProvider) {}
 
     // Refresh the view
@@ -36,8 +37,13 @@ export class GeneratedCodeProvider implements vscode.TreeDataProvider<vscode.Tre
             arguments: [code],  // Pass the full generated code as an argument
         };
     
+        this.latestCode = code;  // Store the full code as `latestCode`
         this.generatedCode = [treeItem];  // Update with new TreeItem
         this.refresh();  // Refresh the TreeView fir new requests
+    }
+    // Expose the latest generated code as a string
+    getLatestGeneratedCode(): string {
+        return this.latestCode;
     }
     
 

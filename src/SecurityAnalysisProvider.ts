@@ -1,40 +1,59 @@
 import * as vscode from 'vscode';
+import { runCTests } from './testers/cTester';
+import { GeneratedCodeProvider } from './generatedCodeProvider';
 
 // This class is for the Security Analysis panel
 export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-    // Event emitter to signal changes in the tree data
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
 
-    // Placeholder for security analysis results, initialized with a hardcoded issue
-    private securityIssues: vscode.TreeItem[] = [
-        new vscode.TreeItem("Hardcoded issue: Potential buffer overflow detected.")
-    ];
+    private securityIssues: vscode.TreeItem[] = [];
 
-    // Method to refresh the view (e.g., after performing analysis)
+    constructor(private generatedCodeProvider: GeneratedCodeProvider) {}
+
     refresh(): void {
         this._onDidChangeTreeData.fire();
     }
 
-    // Method to update the security analysis results
-    updateSecurityAnalysis(issues: string[]): void {
-        // Convert the list of issues into TreeItems
-        this.securityIssues = issues.map(issue => new vscode.TreeItem(issue));
+    clear(): void {
+        this.securityIssues = [];
         this.refresh();
     }
 
-    // Method to get individual TreeItems (security issues)
+    // Method to run security analysis on the latest generated code
+    async analyzeLatestGeneratedCode(): Promise<void> {
+        // Get the latest generated code directly as a string
+        const code = this.generatedCodeProvider.getLatestGeneratedCode();
+
+        if (code) {
+            this.clear();  // Clear previous analysis results
+            runCTests(code, this);  // Run the C tests and update security issues
+        } else {
+            vscode.window.showWarningMessage("No code generated to analyze.");
+        }
+     }
+
+    updateSecurityAnalysis(issues: string[]): void {
+        this.securityIssues = issues.map(issue => {
+            const item = new vscode.TreeItem(issue);
+            item.iconPath = new vscode.ThemeIcon("warning");
+            item.tooltip = `Security issue detected: ${issue}`;
+            return item;
+        });
+        this.refresh();
+    }
+
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
         return element;
     }
 
-    // Method to get the list of children items (security issues)
     getChildren(): vscode.TreeItem[] {
-        // Return security issues if any, or a message indicating no issues found
         if (this.securityIssues.length > 0) {
             return this.securityIssues;
         } else {
-            return [new vscode.TreeItem("No security issues found!")];
+            const noIssuesItem = new vscode.TreeItem("No security issues found!");
+            noIssuesItem.iconPath = new vscode.ThemeIcon("check");
+            return [noIssuesItem];
         }
     }
 }
