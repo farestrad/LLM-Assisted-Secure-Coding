@@ -157,7 +157,32 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
      const errorPattern = /\bprintf\(|fprintf\(|stderr|strerror\(/;
      if (errorPattern.test(code)) {
          issues.push("Warning: Improper error handling and logging detected. Ensure proper error messages and logging.");
-     } 
+     }
+     
+     // Check for improper inputs validation
+    const inputPattern = /\batoi\(|atol\(|atof\(|gets\(|scanf\(/;
+    if (inputPattern.test(code)) {
+        issues.push("Warning: Improper input validation detected. Ensure proper input validation and sanitization.");
+    }
+
+    // Check for hard coded credentials
+    const hardCodedPattern = /\b(password|secret|apikey)\s*=\s*["'].*["']/;
+    if (hardCodedPattern.test(code)) {
+        issues.push("Warning: Hardcoded credentials detected. Avoid hardcoding credentials in the code.");
+    }
+
+    // Check for improper privilege management
+    const privilegePattern = /\bsetuid\(|setgid\(|seteuid\(|setegid\(/;
+    if (privilegePattern.test(code)) {
+        issues.push("Warning: Improper privilege management detected. Avoid using setuid, setgid, seteuid, and setegid.");
+    }
+
+    // Check for improper session management
+    const sessionPattern = /\bsession_start\(|session_id\(/;
+    if (sessionPattern.test(code)) {
+        issues.push("Warning: Improper session management detected. Ensure proper session handling.");
+    }
+
 
     return issues;
 }
