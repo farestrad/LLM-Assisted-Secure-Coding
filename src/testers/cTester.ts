@@ -183,6 +183,24 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
         }
     }
 
+    // Check for recursive functions with local buffers (stack overflow risk)
+    const recursivePattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*\bchar\s+(\w+)\[(\d+)\];[^}]*\b\1\s*\([^}]*\)/g;
+    while ((match = recursivePattern.exec(code)) !== null) {
+        const funcName = match[1];
+        issues.push(`Warning: Recursive function ${funcName} with local buffer detected. Ensure recursion depth is limited to prevent stack overflow.`);
+    }
+
+    // 6. Check for functions with large local buffers (stack overflow risk in deeply nested calls)
+    const functionPattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*\bchar\s+(\w+)\[(\d+)\];/g;
+    const stackThreshold = 512;  // Define a threshold for large buffer size
+    while ((match = functionPattern.exec(code)) !== null) {
+        const funcName = match[1];
+        const bufferSize = parseInt(match[3], 10);
+        if (bufferSize > stackThreshold) {
+            issues.push(`Warning: Function ${funcName} has a large local buffer (${bufferSize} bytes). Excessive nested calls may lead to stack overflow.`);
+        }
+    }
+
      ///////////////////////////////////
  
      // Check for command injection vulnerabilities
