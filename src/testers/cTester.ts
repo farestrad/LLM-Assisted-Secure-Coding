@@ -109,6 +109,47 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
     }
 
     // Additional static analysis checks from GitHub code
+     //detect loops that iterate over a buffer withouth proper bound checking
+    const loopPattern = /\b(for|while)\b[^{]*?\{[^}]*?\bchar\s+(\w+)\[(\d+)\]/g;
+    while ((match = loopPattern.exec(code)) !== null) {
+        const bufferName = match[2];
+        if (!new RegExp(`sizeof\\(${bufferName}\\)`).test(match[0])) {
+        issues.push(`Warning: Loop operating on buffer ${bufferName} does not check for buffer limits.`);
+        }
+    }
+    ///////////////
+// 3. Check for potential overflow in memcpy/memmove usage
+    const memcopyPattern = /\b(memcpy|memmove)\s*\(([^,]+),\s*([^,]+),\s*(\d+)\)/g;
+    while ((match = memcopyPattern.exec(code)) !== null) {
+        const functionName = match[1];
+        const bufferName = match[2];
+        const copySize = parseInt(match[3], 10);
+        
+        // Find buffer declaration to get its size
+        const bufferRegex = new RegExp(`\\bchar\\s+${bufferName}\\[(\\d+)\\];`);
+        const bufferMatch = bufferRegex.exec(code);
+        if (bufferMatch) {
+            const bufferSize = parseInt(bufferMatch[1], 10);
+            if (copySize > bufferSize) {
+                issues.push(`Warning: Potential overflow in ${functionName} usage with buffer ${bufferName}. Ensure copy size is within buffer bounds.`);
+            }
+        }
+    }
+
+
+
+    //////////////
+
+    // Check for pointer arithmetic without bounds checking
+    const pointerArithmeticPattern = /\b\w+\[\s*\w+\s*\]/g;
+    while ((match = pointerArithmeticPattern.exec(code)) !== null) {
+        const arrayAccess = match[0];
+        const surroundingCode = code.slice(Math.max(0, match.index - 50), match.index + 50);
+        if (!/sizeof|length|bounds_check/.test(surroundingCode)) {
+            issues.push(`Warning: Array index usage "${arrayAccess}" at position ${match.index} without bounds checking.`);
+        }
+    }
+
     // Check for insecure random number generation
     const randomPattern = /\b(rand|srand)\b/;
     if (randomPattern.test(code)) {
@@ -124,6 +165,7 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
         }
     });
 
+    
     // Check for command injection vulnerabilities
     const commandInjectionPattern = /system\(|popen\(|exec\(|fork\(|wait\(|systemp\(/;
     if (commandInjectionPattern.test(code)) {
