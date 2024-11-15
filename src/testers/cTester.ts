@@ -312,6 +312,4 @@ if (sessionPattern.test(code)) {
 }
 
 return issues;
-
-    return issues;
 }
