@@ -125,12 +125,21 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
 
 
      ////////////////////////////////////
-     // 1. Check for potentially insufficient memory allocation with malloc
+     // Check for potentially insufficient memory allocation with malloc
     const mallocPattern = /\bmalloc\s*\(\s*(\d+)\s*\)/g;
     while ((match = mallocPattern.exec(code)) !== null) {
         const allocatedSize = parseInt(match[1], 10);
         if (allocatedSize < 100) {  // Adjust threshold as needed
             issues.push(`Warning: Potentially insufficient memory allocation with malloc at position ${match.index}. Ensure buffer size is adequate.`);
+        }
+    }
+
+    //  Check for small buffer declarations that could lead to off-by-one errors
+    const arrayPattern = /\bchar\s+\w+\[(\d+)\];/g;
+    while ((match = arrayPattern.exec(code)) !== null) {
+        const bufferSize = parseInt(match[1], 10);
+        if (bufferSize <= 10) {  // Threshold can be adjusted
+            issues.push(`Warning: Possible off-by-one error with buffer size ${bufferSize} at position ${match.index}. Ensure adequate space for null terminator.`);
         }
     }
 
