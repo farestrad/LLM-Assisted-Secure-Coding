@@ -122,6 +122,19 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
              issues.push(`Warning: Unchecked return value of ${func} detected. Ensure memory allocation success.`);
          }
      });
+
+
+     ////////////////////////////////////
+     // 1. Check for potentially insufficient memory allocation with malloc
+    const mallocPattern = /\bmalloc\s*\(\s*(\d+)\s*\)/g;
+    while ((match = mallocPattern.exec(code)) !== null) {
+        const allocatedSize = parseInt(match[1], 10);
+        if (allocatedSize < 100) {  // Adjust threshold as needed
+            issues.push(`Warning: Potentially insufficient memory allocation with malloc at position ${match.index}. Ensure buffer size is adequate.`);
+        }
+    }
+
+     ///////////////////////////////////
  
      // Check for command injection vulnerabilities
      const commandInjectionPattern = /system\(|popen\(|exec\(|fork\(|wait\(|systemp\(/;
