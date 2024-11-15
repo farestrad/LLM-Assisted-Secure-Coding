@@ -208,10 +208,9 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
         issues.push(`Warning: Variable-Length Array ${match[0]} detected. Use malloc/calloc for dynamic buffer allocation to prevent stack overflow.`);
     }
     
-    return issues;
+    
     
 
-     ///////////////////////////////////
  
      // Check for command injection vulnerabilities
      const commandInjectionPattern = /system\(|popen\(|exec\(|fork\(|wait\(|systemp\(/;
