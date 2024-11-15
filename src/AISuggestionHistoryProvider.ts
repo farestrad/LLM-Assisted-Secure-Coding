@@ -58,6 +58,7 @@ export class AISuggestionHistoryProvider implements vscode.TreeDataProvider<AISu
 
     // Update the status of an AI suggestion (accept/reject)
     updateAISuggestionStatus(id: number, status: 'accepted' | 'rejected'): void {
+        
         const suggestion = this.suggestions.find(s => s.id === id);
         if (suggestion) {
             suggestion.status = status;

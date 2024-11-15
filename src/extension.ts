@@ -24,7 +24,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Command to trigger Code Llama generation and display the output
-    let disposable = vscode.commands.registerCommand('codeLlama.runCodeLlama', async () => {
+    const disposable = vscode.commands.registerCommand('codeLlama.runCodeLlama', async () => {
         const outputChannel = vscode.window.createOutputChannel("Code Llama Output");
         outputChannel.show(true);
 

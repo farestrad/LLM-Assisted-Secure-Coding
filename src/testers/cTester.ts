@@ -41,8 +41,8 @@ ${code}
         fs.writeFileSync(tempFilePath, testCode);
         console.log(`Code written to ${tempFilePath}`);
 
-        await compileCode(tempFilePath, securityAnalysisProvider);
-        await executeCompiledCode(securityAnalysisProvider);
+      //  await compileCode(tempFilePath, securityAnalysisProvider);
+       // await executeCompiledCode(securityAnalysisProvider);
     } catch (error) {
         const err = error as Error; // Cast 'error' to 'Error' type
         console.error("Error in runCTests:", err.message);
@@ -51,6 +51,7 @@ ${code}
 }
 
 // Compile the C code and handle any compilation errors
+/*
 async function compileCode(filePath: string, securityAnalysisProvider: any): Promise<void> {
     try {
         const { stderr } = await execPromise(`gcc ${filePath} -o temp_test_code`);
@@ -79,6 +80,7 @@ async function executeCompiledCode(securityAnalysisProvider: any): Promise<void>
         securityAnalysisProvider.updateSecurityAnalysis([`Test execution failed: ${err.message}`]);
     }
 }
+    */
 
 // Analyze code for buffer overflow risks and other security issues
 function analyzeCodeForSecurityIssues(code: string): string[] {
