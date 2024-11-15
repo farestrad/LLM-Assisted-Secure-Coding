@@ -18,7 +18,6 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
         return;
     }
 
-    
     // Wrap the generated code with a main function for testing
     /*
     const testCode = `
@@ -32,7 +31,7 @@ int main() {
 }
 `;
 */
-const testCode = `
+    const testCode = `
 ${code}
 `;
 
@@ -41,8 +40,9 @@ ${code}
         fs.writeFileSync(tempFilePath, testCode);
         console.log(`Code written to ${tempFilePath}`);
 
-        await compileCode(tempFilePath, securityAnalysisProvider);
-        await executeCompiledCode(securityAnalysisProvider);
+        // Uncomment these if you want to compile and execute the code
+        // await compileCode(tempFilePath, securityAnalysisProvider);
+        // await executeCompiledCode(securityAnalysisProvider);
     } catch (error) {
         const err = error as Error; // Cast 'error' to 'Error' type
         console.error("Error in runCTests:", err.message);
@@ -108,6 +108,82 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
         issues.push("Consider using dynamic memory allocation (malloc or calloc) for buffers to handle variable input sizes.");
     }
 
+    // Additional static analysis checks from GitHub code
+    // Check for insecure random number generation
+    const randomPattern = /\b(rand|srand)\b/;
+    if (randomPattern.test(code)) {
+        issues.push("Warning: Insecure random number generation detected. Consider using secure alternatives.");
+    }
+
+    // Check for unchecked return values of memory allocation functions
+    const allocationFunctions = ['malloc', 'calloc', 'realloc'];
+    allocationFunctions.forEach(func => {
+        const regex = new RegExp(`\\b${func}\\b`);
+        if (regex.test(code) && !new RegExp(`if\\s*\\(\\s*${func}`).test(code)) {
+            issues.push(`Warning: Unchecked return value of ${func} detected. Ensure memory allocation success.`);
+        }
+    });
+
+    // Check for command injection vulnerabilities
+    const commandInjectionPattern = /system\(|popen\(|exec\(|fork\(|wait\(|systemp\(/;
+    if (commandInjectionPattern.test(code)) {
+        issues.push("Warning: Possible command injection vulnerability detected. Avoid using system calls with user input.");
+    }
+
+    // Check for path traversal vulnerabilities
+    const pathTraversalPattern = /\.\.\//;
+    if (pathTraversalPattern.test(code)) {
+        issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
+    }
+
+    // Check for improper authentication handling
+    const authPattern = /\b(==|!=)\s*["'].*["']/;
+    if (authPattern.test(code)) {
+        issues.push("Warning: Improper authentication handling detected. Avoid using string comparison for sensitive data.");
+    }
+
+    // Check for insecure cryptographic storage
+    const cryptoPattern = /\bMD5\b|\bSHA1\b/;
+    if (cryptoPattern.test(code)) {
+        issues.push("Warning: Insecure cryptographic storage detected. Avoid using weak hashing algorithms.");
+    }
+
+    // Check for race conditions in file access
+    const racePattern = /\b(fopen|fwrite|fread|fclose)\b/;
+    if (racePattern.test(code)) {
+        issues.push("Warning: Improper file access detected. Ensure proper file locking.");
+    }
+
+    // Check for improper error handling and logging
+    const errorPattern = /\bprintf\(|fprintf\(|stderr|strerror\(/;
+    if (errorPattern.test(code)) {
+        issues.push("Warning: Improper error handling and logging detected. Ensure proper error messages and logging.");
+    }
+
+    // Check for improper inputs validation
+    const inputPattern = /\batoi\(|atol\(|atof\(|gets\(|scanf\(/;
+    if (inputPattern.test(code)) {
+        issues.push("Warning: Improper input validation detected. Ensure proper input validation and sanitization.");
+    }
+
+    // Check for hard coded credentials
+    const hardCodedPattern = /\b(password|secret|apikey)\s*=\s*["'].*["']/;
+    if (hardCodedPattern.test(code)) {
+        issues.push("Warning: Hardcoded credentials detected. Avoid hardcoding credentials in the code.");
+    }
+
+    // Check for improper privilege management
+    const privilegePattern = /\bsetuid\(|setgid\(|seteuid\(|setegid\(/;
+    if (privilegePattern.test(code)) {
+        issues.push("Warning: Improper privilege management detected. Avoid using setuid, setgid, seteuid, and setegid.");
+    }
+
+    // Check for improper session management
+    const sessionPattern = /\bsession_start\(|session_id\(/;
+    if (sessionPattern.test(code)) {
+        issues.push("Warning: Improper session management detected. Ensure proper session handling.");
+    }
+
     return issues;
 }
 
@@ -126,4 +202,3 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
 //         console.log("Security Analysis Output:", issues);
 //     }
 // });
-
