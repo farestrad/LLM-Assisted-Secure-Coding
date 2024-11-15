@@ -329,4 +329,5 @@ function checkHeapOverflowVulnerabilities(code: string): string[] {
 function analyzeCodeForPlaintextPasswords(code: string): string[] {
     const issues: string[] = [];
     return issues;
+    //
 }
