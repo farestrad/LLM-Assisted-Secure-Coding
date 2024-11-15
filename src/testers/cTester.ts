@@ -143,6 +143,24 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
         }
     }
 
+    // Check for potential overflow in memcpy/memmove usage
+    const memcopyPattern = /\b(memcpy|memmove)\s*\(([^,]+),\s*([^,]+),\s*(\d+)\)/g;
+    while ((match = memcopyPattern.exec(code)) !== null) {
+        const functionName = match[1];
+        const bufferName = match[2];
+        const copySize = parseInt(match[3], 10);
+        
+        // Find buffer declaration to get its size
+        const bufferRegex = new RegExp(`\\bchar\\s+${bufferName}\\[(\\d+)\\];`);
+        const bufferMatch = bufferRegex.exec(code);
+        if (bufferMatch) {
+            const bufferSize = parseInt(bufferMatch[1], 10);
+            if (copySize > bufferSize) {
+                issues.push(`Warning: Potential overflow in ${functionName} usage with buffer ${bufferName}. Ensure copy size is within buffer bounds.`);
+            }
+        }
+    }
+
      ///////////////////////////////////
  
      // Check for command injection vulnerabilities
