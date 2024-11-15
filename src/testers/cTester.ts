@@ -161,6 +161,28 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
         }
     }
 
+    // check for sprintf usage without bounds and snprintf exceeding buffer size
+    const sprintfPattern = /\b(sprintf|snprintf)\s*\(([^,]+),\s*(\d+)?\s*,\s*.+?\)/g;
+    while ((match = sprintfPattern.exec(code)) !== null) {
+        const functionName = match[1];
+        const bufferName = match[2];
+        
+        if (functionName === 'sprintf') {
+            issues.push(`Warning: Use of sprintf detected with buffer ${bufferName}. Prefer snprintf for bounded writing.`);
+        } else if (functionName === 'snprintf') {
+            const specifiedBound = parseInt(match[3], 10);
+            const bufferRegex = new RegExp(`\\bchar\\s+${bufferName}\\[(\\d+)\\];`);
+            const bufferMatch = bufferRegex.exec(code);
+            
+            if (bufferMatch) {
+                const bufferSize = parseInt(bufferMatch[1], 10);
+                if (specifiedBound > bufferSize) {
+                    issues.push(`Warning: snprintf usage with ${bufferName} exceeds buffer size. Reduce the size parameter.`);
+                }
+            }
+        }
+    }
+
      ///////////////////////////////////
  
      // Check for command injection vulnerabilities
