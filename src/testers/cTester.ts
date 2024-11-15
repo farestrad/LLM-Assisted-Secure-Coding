@@ -328,6 +328,14 @@ function checkHeapOverflowVulnerabilities(code: string): string[] {
 // Heap Vulnerability Checks
 function analyzeCodeForPlaintextPasswords(code: string): string[] {
     const issues: string[] = [];
+
+    // 1. Look for password-related variables
+    const passwordPattern = /\b(pass|password|passwd| pwd | user_password | admin_password | auth_pass | login_password | secure_password | db_password | secret_key | passphrase |master_password)\b.*=/g;
+    let match;
+    while ((match = passwordPattern.exec(code)) !== null) {
+        const passwordVar = match[0];
+        issues.push(`Warning: Potential password variable (${passwordVar}) detected. Ensure it is not stored in plaintext.`);
+    }
     return issues;
     //
 }
