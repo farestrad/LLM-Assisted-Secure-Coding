@@ -190,7 +190,7 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
         issues.push(`Warning: Recursive function ${funcName} with local buffer detected. Ensure recursion depth is limited to prevent stack overflow.`);
     }
 
-    // 6. Check for functions with large local buffers (stack overflow risk in deeply nested calls)
+    //  Check for functions with large local buffers (stack overflow risk in deeply nested calls)
     const functionPattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*\bchar\s+(\w+)\[(\d+)\];/g;
     const stackThreshold = 512;  // Define a threshold for large buffer size
     while ((match = functionPattern.exec(code)) !== null) {
@@ -200,6 +200,16 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
             issues.push(`Warning: Function ${funcName} has a large local buffer (${bufferSize} bytes). Excessive nested calls may lead to stack overflow.`);
         }
     }
+
+    // Check for variable-length arrays (VLAs)
+    const vlaPattern = /\bchar\s+\w+\[(\w+)\];/g;
+    while ((match = vlaPattern.exec(code)) !== null) {
+        const sizeVariable = match[1];
+        issues.push(`Warning: Variable-Length Array ${match[0]} detected. Use malloc/calloc for dynamic buffer allocation to prevent stack overflow.`);
+    }
+    
+    return issues;
+    
 
      ///////////////////////////////////
  
