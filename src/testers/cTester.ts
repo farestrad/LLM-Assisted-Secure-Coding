@@ -91,6 +91,7 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
     issues.push(...checkRaceConditionVulnerabilities(code));
     issues.push(...checkOtherVulnerabilities(code));
     issues.push(...checkHeapOverflowVulnerabilities(code));
+    issues.push(...analyzeCodeForPlaintextPasswords(code));
 
     return issues;
 }
@@ -317,8 +318,15 @@ return issues;
 
 
 
-// Other Vulnerability Checks
+// Heap Vulnerability Checks
 function checkHeapOverflowVulnerabilities(code: string): string[] {
+    const issues: string[] = [];
+    return issues;
+}
+
+
+// Heap Vulnerability Checks
+function analyzeCodeForPlaintextPasswords(code: string): string[] {
     const issues: string[] = [];
     return issues;
 }
