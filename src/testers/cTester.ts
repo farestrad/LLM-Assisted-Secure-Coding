@@ -336,6 +336,13 @@ function analyzeCodeForPlaintextPasswords(code: string): string[] {
         const passwordVar = match[0];
         issues.push(`Warning: Potential password variable (${passwordVar}) detected. Ensure it is not stored in plaintext.`);
     }
+    //2.  Look for file write operations involving password variables
+    const fileWritePattern = /\b(fwrite|fprintf|write|ofstream|fputs)\b\s*\(([^,]+),?/g;
+    while ((match = fileWritePattern.exec(code)) !== null) {
+        issues.push(`Warning: File write operation detected. Ensure sensitive data is encrypted before storage.`);
+    }
+
     return issues;
-    //
+
+
 }
