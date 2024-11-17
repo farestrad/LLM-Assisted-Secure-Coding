@@ -159,7 +159,7 @@ while ((match = sprintfPattern.exec(code)) !== null) {
             const bufferSize = parseInt(bufferMatch[1], 10);
             if (specifiedBound > bufferSize) {
                 issues.push(
-                    `Warning: snprintf usage with ${bufferName} exceeds buffer size. Reduce the size parameter.`
+                 `Warning: snprintf usage with ${bufferName} exceeds buffer size. Reduce the size parameter.`
                 );
             }
         }
@@ -345,4 +345,38 @@ function analyzeCodeForPlaintextPasswords(code: string): string[] {
     return issues;
 
 
+}
+
+// Path Traversal Vulnerability Checks
+function checkPathTraversalVulnerabilities(code: string): string[] {
+    const issues: string[] = [];
+    let match;
+    // Check for path traversal
+    const pathTraversalPattern = /\.\.\//g;
+    if (pathTraversalPattern.test(code)) {
+        issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
+    }
+
+    // Check to detect risky functions that can lead to path traversal
+    const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
+    riskyFunctions.forEach(func => {
+        const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+\\)`, 'g');
+        while ((match = regex.exec(code)) !== null) {
+            const argument = (match as RegExpExecArray)[1].trim();
+            if (argument.includes('../') || argument.includes('"') || argument.includes('`')) {
+                issues.push(`Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.`);
+            }
+        }
+    });
+
+    // Check to detect unsanitized input usage in file operations
+    const usagePattern = /(\bopen\b|\bread\b|\bwrite\b|\bfread\b|\bfwrite\b|\s*\(([^,]+),?)/g;
+    while ((match = usagePattern.exec(code)) !== null) {
+        const input = match[2].trim();
+        if (!isSanitized(input, code)) {
+            issues.push(`Warning: Potential Path Traversal vulnerability detected. Ensure input is sanitized before use.`);
+        }
+    }
+
+    return issues;
 }
