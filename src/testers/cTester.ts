@@ -380,3 +380,9 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
 
     return issues;
 }
+
+// Helper function to check if input is sanitized 
+function isSanitized(input: string, code: string): boolean {
+    const sanitizedPattern = new RegExp(`sanitize\\s*\\(\\s*${input}\\s*\\`, 'g');
+    return sanitizedPattern.test(code);
+}
