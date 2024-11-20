@@ -49,7 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
                     },
                     body: JSON.stringify({
                         model: 'llama3',
-                        prompt: `Only provide the C code with no additional explanation, comments, or extra text at all, and do not write the letter c on top or anywhere else. Write the C code to accomplish the following task: ${selectedText}`,
+                        prompt: `Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c  on top . Write the C code to accomplish the following task: ${selectedText}`,
                         stream: true,
                     }),
                 });

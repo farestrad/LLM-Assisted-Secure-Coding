@@ -92,6 +92,9 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
     issues.push(...checkOtherVulnerabilities(code));
     issues.push(...checkHeapOverflowVulnerabilities(code));
     issues.push(...analyzeCodeForPlaintextPasswords(code));
+    issues.push(...analyzeCodeForWeakHashingAndEncryption(code));
+
+    
 
     return issues;
 }
@@ -159,7 +162,7 @@ while ((match = sprintfPattern.exec(code)) !== null) {
             const bufferSize = parseInt(bufferMatch[1], 10);
             if (specifiedBound > bufferSize) {
                 issues.push(
-                 `Warning: snprintf usage with ${bufferName} exceeds buffer size. Reduce the size parameter.`
+                    `Warning: snprintf usage with ${bufferName} exceeds buffer size. Reduce the size parameter.`
                 );
             }
         }
@@ -345,44 +348,33 @@ function analyzeCodeForPlaintextPasswords(code: string): string[] {
     return issues;
 
 
+
 }
 
-// Path Traversal Vulnerability Checks
-function checkPathTraversalVulnerabilities(code: string): string[] {
+
+function analyzeCodeForWeakHashingAndEncryption(code: string): string[] {
     const issues: string[] = [];
+
+    // 1. Detect weak hashing mechanisms
+    const weakHashPattern = /\b(md5|sha1|crypt)\b\s*\(/g;
     let match;
-    // Check for path traversal
-    const pathTraversalPattern = /\.\.\//g;
-    if (pathTraversalPattern.test(code)) {
-        issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
+    while ((match = weakHashPattern.exec(code)) !== null) {
+        const weakHash = match[1];
+        issues.push(`Warning: Weak hashing algorithm (${weakHash}) detected. Consider using a strong hash function like bcrypt, scrypt, or Argon2.`);
     }
 
-    // Check to detect risky functions that can lead to path traversal
-    const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
-    riskyFunctions.forEach(func => {
-        const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+\\)`, 'g');
-        while ((match = regex.exec(code)) !== null) {
-            const argument = (match as RegExpExecArray)[1].trim();
-            if (argument.includes('../') || argument.includes('"') || argument.includes('`')) {
-                issues.push(`Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.`);
-            }
-        }
-    });
+    // 2. Detect encryption usage for passwords
+    const encryptionPattern = /\b(encrypt|aes_encrypt|des_encrypt|blowfish_encrypt|crypto_encrypt|rsa_encrypt)\b\s*\(/gi;
+    while ((match = encryptionPattern.exec(code)) !== null) {
+        const encryptionMethod = match[1];
+        issues.push(`Warning: Passwords should not be encrypted using ${encryptionMethod}. Use a secure hashing algorithm (e.g., bcrypt, Argon2) instead.`);
+    }
 
-    // Check to detect unsanitized input usage in file operations
-    const usagePattern = /(\bopen\b|\bread\b|\bwrite\b|\bfread\b|\bfwrite\b|\s*\(([^,]+),?)/g;
-    while ((match = usagePattern.exec(code)) !== null) {
-        const input = match[2].trim();
-        if (!isSanitized(input, code)) {
-            issues.push(`Warning: Potential Path Traversal vulnerability detected. Ensure input is sanitized before use.`);
-        }
+    // 3. Detect direct calls to insecure hash libraries in code
+    const hashLibraryPattern = /\b#include\s*<openssl\/md5.h>|#include\s*<openssl\/sha.h>/g;
+    if (hashLibraryPattern.test(code)) {
+        issues.push(`Warning: Insecure hash library inclusion detected. Avoid using MD5 or SHA-1 from OpenSSL or similar libraries for password hashing.`);
     }
 
     return issues;
-}
-
-// Helper function to check if input is sanitized 
-function isSanitized(input: string, code: string): boolean {
-    const sanitizedPattern = new RegExp(`sanitize\\s*\\(\\s*${input}\\s*\\`, 'g');
-    return sanitizedPattern.test(code);
 }
