@@ -95,6 +95,8 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
     issues.push(...analyzeCodeForWeakHashingAndEncryption(code));
     issues.push(...checkInfiniteLoopsOrExcessiveResourceConsumption(code));
     issues.push(...checkIntegerOverflowUnderflow(code));
+    issues.push(...checkRandomNumberGeneration(code));
+    issues.push(...checkPathTraversalVulnerabilities(code));
 
     
 
