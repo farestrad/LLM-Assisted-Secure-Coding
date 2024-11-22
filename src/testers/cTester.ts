@@ -93,6 +93,8 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
     issues.push(...checkHeapOverflowVulnerabilities(code));
     issues.push(...analyzeCodeForPlaintextPasswords(code));
     issues.push(...analyzeCodeForWeakHashingAndEncryption(code));
+    issues.push(...checkInfiniteLoopsOrExcessiveResourceConsumption(code));
+    issues.push(...checkIntegerOverflowUnderflow(code));
 
     
 
@@ -378,3 +380,72 @@ function analyzeCodeForWeakHashingAndEncryption(code: string): string[] {
 
     return issues;
 }
+
+//for Denial of Service through infinite loops leading to a crash.
+function checkInfiniteLoopsOrExcessiveResourceConsumption(code: string): string[] {
+    const issues: string[] = [];
+    let match;
+
+    // Check for loops without clear termination
+    const infiniteLoopPattern = /\bfor\s*\([^;]*;\s*;[^)]*\)|\bwhile\s*\(true\)/g;
+    while ((match = infiniteLoopPattern.exec(code)) !== null) {
+        issues.push(`Warning: Potential infinite loop detected at position ${match.index}. Ensure proper termination conditions.`);
+    }
+
+    // Detect excessive memory allocations
+    const largeAllocationPattern = /\bmalloc\s*\(\s*(\d+)\s*\)|\bcalloc\s*\([^,]+,\s*(\d+)\)/g;
+    while ((match = largeAllocationPattern.exec(code)) !== null) {
+        const allocatedSize = parseInt(match[1] || match[2], 10);
+        if (allocatedSize > 1024 * 1024) { // Example threshold: 1 MB
+            issues.push(`Warning: Excessive memory allocation (${allocatedSize} bytes) detected. Review memory usage.`);
+        }
+    }
+
+    return issues;
+}
+
+//testing for interger Overflow and Underflows
+function checkIntegerOverflowUnderflow(code: string): string[] {
+    const issues: string[] = [];
+    const overflowPattern = /\b(\w+)\s*=\s*([\d\-]+)\s*([\+\-\*\/])\s*([\d\-]+)/g;
+    const MAX_INT = Number.MAX_SAFE_INTEGER; // 2^53 - 1
+    const MIN_INT = Number.MIN_SAFE_INTEGER; // -(2^53 - 1)
+
+    let match;
+    while ((match = overflowPattern.exec(code)) !== null) {
+        const variable = match[1]; // Captured variable being assigned
+        const leftOperand = parseInt(match[2], 10); // First number
+        const operator = match[3]; // Arithmetic operator
+        const rightOperand = parseInt(match[4], 10); // Second number
+
+        // Perform the arithmetic operation
+        let result;
+        switch (operator) {
+            case '+':
+                result = leftOperand + rightOperand;
+                break;
+            case '-':
+                result = leftOperand - rightOperand;
+                break;
+            case '*':
+                result = leftOperand * rightOperand;
+                break;
+            case '/':
+                result = rightOperand !== 0 ? leftOperand / rightOperand : null;
+                break;
+            default:
+                result = null; // Should never hit this case with current regex
+        }
+
+        // Check for overflow/underflow
+        if (result !== null && (result > MAX_INT || result < MIN_INT)) {
+            issues.push(
+                `Warning: Integer overflow/underflow detected for variable "${variable}" in operation "${leftOperand} ${operator} ${rightOperand}".`
+            );
+        }
+    }
+
+    return issues;
+}
+
+

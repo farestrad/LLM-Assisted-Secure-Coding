@@ -7,6 +7,14 @@
 - ```git fetch origin```
 - ```git reset --hard origin/main```
 
+## How to create a pull request
+- ```git checkout -b <branch-name>```
+- ```git add .```
+- ```git commit -m "Description of the changes made"```
+- ```git push origin <branch-name>```
+
+
+
 ## Steps to Deploying the server
 - go to https://www.digitalocean.com and scroll down till you see Sign up and get $200 in credit for your first 60 days with DigitalOcean.* click the button and sign up this gives you a $200 credit
 - after setup click first project
