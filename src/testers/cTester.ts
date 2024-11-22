@@ -263,24 +263,11 @@ function checkOtherVulnerabilities(code: string): string[] {
         issues.push("Warning: Possible command injection vulnerability detected. Avoid using system calls with user input.");
     }
 
-    // Check for path traversal
-    const pathTraversalPattern = /\.\.\//;
-    if (pathTraversalPattern.test(code)) {
-        issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
-    }
-
     // Check for hardcoded credentials
     const hardCodedPattern = /\b(password|secret|apikey)\s*=\s*["'].*["']/;
     if (hardCodedPattern.test(code)) {
         issues.push("Warning: Hardcoded credentials detected. Avoid hardcoding sensitive information.");
     }
-    
-
-    // Check for insecure random number generation
-const randomPattern = /\b(rand|srand)\b/;
-if (randomPattern.test(code)) {
-    issues.push("Warning: Insecure random number generation detected. Consider using secure alternatives.");
-}
 
 // Check for improper authentication handling
 const authPattern = /\b(==|!=)\s*["'].*["']/;
@@ -349,8 +336,72 @@ function analyzeCodeForPlaintextPasswords(code: string): string[] {
 
     return issues;
 
+}
 
+// Path Traversal Vulnerability Checks
+function checkPathTraversalVulnerabilities(code: string): string[] {
+    const issues: string[] = [];
+    let match;
+    // Check for path traversal
+    const pathTraversalPattern = /\.\.\//g;
+    if (pathTraversalPattern.test(code)) {
+        issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
+    }
 
+    // Check to detect risky functions that can lead to path traversal
+    const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
+    riskyFunctions.forEach(func => {
+        const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+\\)`, 'g');
+        while ((match = regex.exec(code)) !== null) {
+            const argument = (match as RegExpExecArray)[1].trim();
+            if (argument.includes('../') || argument.includes('"') || argument.includes('`')) {
+                issues.push(`Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.`);
+            }
+        }
+    });
+
+    // Check to detect unsanitized input usage in file operations
+    const usagePattern = /(\bopen\b|\bread\b|\bwrite\b|\bfread\b|\bfwrite\b|\s*\(([^,]+),?)/g;
+    while ((match = usagePattern.exec(code)) !== null) {
+        const input = match[2].trim();
+        if (!isSanitized(input, code)) {
+            issues.push(`Warning: Potential Path Traversal vulnerability detected. Ensure input is sanitized before use.`);
+        }
+    }
+
+    return issues;
+}
+
+// Helper function to check if input is sanitized 
+function isSanitized(input: string, code: string): boolean {
+    const sanitizedPattern = new RegExp(`sanitize\\s*\\(\\s*${input}\\s*\\`, 'g');
+    return sanitizedPattern.test(code);
+}
+
+// Check for insecure random number generation
+function checkRandomNumberGeneration(code: string): string[] {
+    const issues: string[] = [];
+    let match;
+
+    // Detect insecure random functions
+    const insecureRandomPattern = /\b(rand|srand|random|drand48|lrand48|rand_r|random_r|srandom|srandom_r)\b/;
+    if (insecureRandomPattern.test(code)) {
+        issues.push("Warning: Insecure random number generator detected. Consider using secure alternatives or secure libraries.");
+    }
+
+    // Detect insecure seeding with time(NULL)
+    const randomSeedPattern = /\bsrand\s*\(\s*time\s*\(\s*NULL\s*\)\s*\)/g;
+    while ((match = randomSeedPattern.exec(code)) !== null) {
+        issues.push("Warning: Using time(NULL) as a seed is insecure. Use a more secure seed source.");
+    }
+
+    // Detect use of insecure RNG in loops
+    const loopPattern = /\b(rand|random|drand48|lrand48)\b.*?for\s*\(/g;
+    while ((match = loopPattern.exec(code)) !== null) {
+        issues.push(`Warning: Insecure RNG '${match[1]}' detected in a loop. Ensure unbiased and secure random number generation.`);
+    }
+
+    return issues;
 }
 
 
