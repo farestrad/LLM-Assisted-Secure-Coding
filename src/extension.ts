@@ -42,7 +42,7 @@ export function activate(context: vscode.ExtensionContext) {
             outputChannel.appendLine('Generating code with Code Llama...');
 
             try {
-                const response = await fetch('http://178.128.231.154:11434/api/generate', {
+                const response = await fetch('http://172.105.25.95:11434/api/generate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
