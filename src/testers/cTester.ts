@@ -96,7 +96,7 @@ function analyzeCodeForSecurityIssues(code: string): string[] {
     issues.push(...checkInfiniteLoopsOrExcessiveResourceConsumption(code));
     issues.push(...checkIntegerOverflowUnderflow(code));
     issues.push(...checkRandomNumberGeneration(code));
-  //  issues.push(...checkPathTraversalVulnerabilities(code));
+    issues.push(...checkPathTraversalVulnerabilities(code));
 
     
 
@@ -470,7 +470,7 @@ function checkIntegerOverflowUnderflow(code: string): string[] {
 }
 
 
-/*CODE FOR MIN
+//CODE FOR MIN
 
 // Path Traversal Vulnerability Checks
 function checkPathTraversalVulnerabilities(code: string): string[] {
@@ -505,4 +505,3 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
 
     return issues;
 }
-*/
