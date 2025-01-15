@@ -63,7 +63,6 @@
         "command": "extension.testSecurityAnalysis",
         "title": "Test Security Analysis Panel"
       }
-      
     ],
     "keybindings": [
       {
@@ -142,6 +141,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "axios": "^1.7.9",
     "node-fetch": "^2.7.0"
   }
 }
