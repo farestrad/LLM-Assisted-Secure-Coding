@@ -477,7 +477,7 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
     const issues: string[] = [];
     let match;
     // Check for path traversal
-    const pathTraversalPattern = /\.\.\//g;
+    const pathTraversalPattern = /\..\//g;
     if (pathTraversalPattern.test(code)) {
         issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
     }
