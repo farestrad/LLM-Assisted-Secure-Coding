@@ -18,8 +18,7 @@
     "onCommand:extension.rejectAISuggestion",
     "onCommand:extension.triggerAISuggestion",
     "onCommand:extension.acceptCodeChanges",
-    "onCommand:extension.toggleAssistantSidebar",
-    "onCommand:extension.fetchCveDetails"  
+    "onCommand:extension.toggleAssistantSidebar"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -63,10 +62,6 @@
       {
         "command": "extension.testSecurityAnalysis",
         "title": "Test Security Analysis Panel"
-      },
-      {
-        "command": "extension.fetchCveDetails", 
-        "title": "Fetch CVE Details"
       }
     ],
     "keybindings": [
@@ -84,11 +79,6 @@
         "command": "extension.toggleAssistantSidebar",
         "key": "ctrl+alt+d",
         "when": "editorTextFocus"
-      },
-      {
-        "command": "extension.fetchCveDetails", 
-        "key": "ctrl+alt+c",
-        "when": "editorTextFocus"
       }
     ],
     "menus": {
@@ -101,11 +91,6 @@
         {
           "command": "extension.rejectAISuggestion",
           "when": "view == aiSuggestionHistoryView && aiSuggestion == 'pending'",
-          "group": "inline"
-        },
-        {
-          "command": "extension.fetchCveDetails",  
-          "when": "view == securityAnalysisView",
           "group": "inline"
         }
       ]
@@ -123,32 +108,8 @@
         {
           "id": "aiSuggestionHistoryView",
           "name": "AI Suggestions History"
-        },
-        {
-          "id": "cveDetailsView",  
-          "name": "CVE Details"
         }
       ]
-    },
-    "configuration": {
-      "type": "object",
-      "title": "Code Llama Integration Settings",
-      "properties": {
-        "codeLlama.apiUrl": {
-          "type": "string",
-          "default": "http://172.105.25.95:11434/api/generate",
-          "description": "The base URL for the Code Llama API"
-        },
-        "codeLlama.cveApiUrl": {  
-          "type": "string",
-          "default": "https://cveawg.mitre.org/api/cve",
-          "description": "The base URL for the CVE database API"
-        },
-        "codeLlama.maxCveResults": {  
-          "default": 10,
-          "description": "The maximum number of CVE results to fetch"
-        }
-      }
     }
   },
   "scripts": {
@@ -183,5 +144,6 @@
     "axios": "^1.7.9",
     "node-fetch": "^2.7.0"
   }
-}
 
+  
+}
