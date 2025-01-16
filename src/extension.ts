@@ -2,28 +2,79 @@ import * as vscode from 'vscode';
 import fetch from 'node-fetch';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
 import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
-import { AISuggestionHistoryProvider, AISuggestion } from './AISuggestionHistoryProvider';  // Import AISuggestion
+import { AISuggestionHistoryProvider, AISuggestion } from './AISuggestionHistoryProvider';  
+import { VulnerabilityDatabaseProvider } from './VulnerabilityDatabaseProvider';
 
+// Activate function
 export function activate(context: vscode.ExtensionContext) {
-    // Create an instance of GeneratedCodeProvider to manage sidebar data
+    // Initialize providers
     const generatedCodeProvider = new GeneratedCodeProvider();
-    vscode.window.registerTreeDataProvider('codeLlamaGeneratedCodeView', generatedCodeProvider);
-
-    // Security Analysis output, with access to GeneratedCodeProvider
     const securityAnalysisProvider = new SecurityAnalysisProvider(generatedCodeProvider);
-    vscode.window.registerTreeDataProvider('securityAnalysisView', securityAnalysisProvider);
-
-    // Initialize the AI Suggestion History Provider
     const aiSuggestionHistoryProvider = new AISuggestionHistoryProvider();
+    const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
+
+    // Register views
+    vscode.window.registerTreeDataProvider('codeLlamaGeneratedCodeView', generatedCodeProvider);
+    vscode.window.registerTreeDataProvider('securityAnalysisView', securityAnalysisProvider);
     vscode.window.registerTreeDataProvider('aiSuggestionHistoryView', aiSuggestionHistoryProvider);
 
-    // Command to trigger a security analysis manually on the latest generated code
-    vscode.commands.registerCommand('extension.runSecurityAnalysis', () => {
-        securityAnalysisProvider.analyzeLatestGeneratedCode();
-        vscode.window.showInformationMessage('Security analysis completed.');
-    });
+    // Command: Run Security Analysis
+    vscode.commands.registerCommand('extension.runSecurityAnalysis', async () => {
+        const editor = vscode.window.activeTextEditor;
 
-    // Command to trigger Code Llama generation and display the output
+        if (!editor) {
+            vscode.window.showWarningMessage('No active editor found. Please open a file to analyze.');
+            return;
+        }
+
+        const code = editor.document.getText();
+        if (!code) {
+            vscode.window.showWarningMessage('No code found in the editor. Please write some code to analyze.');
+            return;
+        }
+
+        // Clear existing results in the Security Analysis panel
+        securityAnalysisProvider.clear();
+
+        // Run security analysis
+        vscode.window.showInformationMessage('Running security analysis...');
+        await securityAnalysisProvider.analyzeLatestGeneratedCode();
+
+        // Fetch CVE details based on detected issues
+        const detectedIssues = securityAnalysisProvider['securityIssues']; // Access detected issues
+
+        if (detectedIssues.length > 0) {
+            try {
+                const cveDetails = [];
+                for (const issue of detectedIssues) {
+                    // Ensure issue.label is a string
+                    const issueLabel = typeof issue.label === 'string' ? issue.label : 'Unknown Issue';
+        
+                    // Fetch CVE details using the validated string label
+                    const fetchedCves = await vulnerabilityDatabaseProvider.fetchMultipleCveDetails(issueLabel);
+        
+                    // Map fetched CVEs into the desired format and add them to the list
+                    cveDetails.push(...fetchedCves.map(cve => ({
+                        id: cve.id,
+                        description: cve.descriptions[0]?.value || 'No description available',
+                    })));
+                }
+        
+                // Update CVE details in the Security Analysis panel
+                securityAnalysisProvider.updateCveDetails(cveDetails);
+                vscode.window.showInformationMessage('CVE details fetched and updated successfully.');
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to fetch CVE details: ${error instanceof Error ? error.message : 'Unknown error'}`
+                );
+            }
+        } else {
+            vscode.window.showInformationMessage('No security issues detected.');
+        }
+    });
+    
+
+    // Command: Generate Code with Code Llama
     const disposable = vscode.commands.registerCommand('codeLlama.runCodeLlama', async () => {
         const outputChannel = vscode.window.createOutputChannel("Code Llama Output");
         outputChannel.show(true);
@@ -143,5 +194,3 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {}
-
-

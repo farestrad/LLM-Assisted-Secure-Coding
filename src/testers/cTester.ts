@@ -3,6 +3,11 @@ import { exec } from 'child_process';
 import * as vscode from 'vscode';
 import { promisify } from 'util';
 
+import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
+
+const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
+
+
 const execPromise = promisify(exec);
 
 // Define the file path, with a fallback to `/tmp` if no workspace is open
@@ -11,10 +16,16 @@ const tempFilePath = vscode.workspace.workspaceFolders
     : `/tmp/temp_test_code.c`; // Fallback to a system temp directory
 
 export async function runCTests(code: string, securityAnalysisProvider: any) {
-    // Run security checks
+    // Step 1: Run vulnerability checks
     const securityIssues = analyzeCodeForSecurityIssues(code);
+
+    // Step 2: If vulnerabilities are found, fetch CVE details for them
     if (securityIssues.length > 0) {
+        const cveDetails = await fetchCveDetailsForIssues(securityIssues);
+
+        // Update the Security Analysis view with issues and CVEs
         securityAnalysisProvider.updateSecurityAnalysis(securityIssues);
+        securityAnalysisProvider.updateCveDetails(cveDetails);
         return;
     }
 
@@ -48,6 +59,31 @@ ${code}
         console.error("Error in runCTests:", err.message);
         securityAnalysisProvider.updateSecurityAnalysis([`Error during testing: ${err.message}`]);
     }
+}
+
+
+// Helper function to fetch CVE details for detected vulnerabilities
+async function fetchCveDetailsForIssues(issues: string[]): Promise<{ id: string; description: string }[]> {
+    const cveDetails: { id: string; description: string }[] = [];
+
+    for (const issue of issues) {
+        try {
+            // Query the CVE database for each issue
+            const cves = await vulnerabilityDatabaseProvider.fetchMultipleCveDetails(issue);
+
+            // Add relevant CVEs to the result list
+            cves.forEach((cve: any) => {
+                cveDetails.push({
+                    id: cve.id,
+                    description: cve.descriptions[0]?.value || 'No description available',
+                });
+            });
+        } catch (error) {
+            console.error(`Error fetching CVEs for "${issue}":`, error);
+        }
+    }
+
+    return cveDetails;
 }
 
 // Compile the C code and handle any compilation errors
