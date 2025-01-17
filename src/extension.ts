@@ -209,13 +209,38 @@ vscode.commands.registerCommand('extension.fetchCveDetails', async () => {
 
     try {
         const cveDetails = await provider.fetchCveDetails(cveId);
-        vscode.window.showInformationMessage(`CVE Details for ${cveId}: ${JSON.stringify(cveDetails, null, 2)}`);
+
+        // Extract relevant details
+        const title = cveDetails.cveMetadata?.cveId || 'Unknown CVE ID';
+        const state = cveDetails.cveMetadata?.state || 'Unknown state';
+        const description =
+            cveDetails.containers?.cna?.descriptions?.[0]?.value ||
+            'No description available.';
+        const affectedProducts =
+            cveDetails.containers?.cna?.affected
+                ?.map((affected: { vendor: string; product: string; versions?: { version: string }[] }) => {
+                    return `- Vendor: ${affected.vendor}, Product: ${affected.product}, Versions: ${
+                        affected.versions?.map((v) => v.version).join(', ') || 'Unknown'
+                    }`;
+                })
+                .join('\n') || 'No affected products listed.';
+
+        // Display the formatted details in a message
+        const formattedDetails = `**CVE Details**\n
+**ID**: ${title}
+**State**: ${state}
+**Description**: ${description}
+**Affected Products**:\n${affectedProducts}`;
+
+        vscode.window.showInformationMessage(formattedDetails, { modal: true });
     } catch (error) {
         vscode.window.showErrorMessage(
             `Failed to fetch CVE details for ${cveId}: ${error instanceof Error ? error.message : 'Unknown error'}`
         );
     }
 });
+
+
 
 
 
