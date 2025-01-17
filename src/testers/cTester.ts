@@ -52,8 +52,6 @@ ${code}
         fs.writeFileSync(tempFilePath, testCode);
         console.log(`Code written to ${tempFilePath}`);
 
-      //  await compileCode(tempFilePath, securityAnalysisProvider);
-       // await executeCompiledCode(securityAnalysisProvider);
     } catch (error) {
         const err = error as Error; // Cast 'error' to 'Error' type
         console.error("Error in runCTests:", err.message);
@@ -86,37 +84,17 @@ async function fetchCveDetailsForIssues(issues: string[]): Promise<{ id: string;
     return cveDetails;
 }
 
-// Compile the C code and handle any compilation errors
-/*
-async function compileCode(filePath: string, securityAnalysisProvider: any): Promise<void> {
-    try {
-        const { stderr } = await execPromise(`gcc ${filePath} -o temp_test_code`);
-        if (stderr) {
-            throw new Error(stderr);
-        }
-        console.log("Compilation successful");
-    } catch (error) {
-        const err = error as Error; // Cast 'error' to 'Error' type
-        console.error("Compilation error:", err.message);
-        securityAnalysisProvider.updateSecurityAnalysis([`Compilation failed: ${err.message}`]);
-        throw err;
-    }
-}
 
-// Execute the compiled code and handle any runtime errors
-async function executeCompiledCode(securityAnalysisProvider: any): Promise<void> {
-    try {
-        const { stdout, stderr } = await execPromise(`./temp_test_code`);
-        const results = stderr ? `Execution failed: ${stderr}` : stdout;
-        console.log("Execution results:", results.trim());
-        securityAnalysisProvider.updateSecurityAnalysis([results.trim()]);
-    } catch (error) {
-        const err = error as Error; // Cast 'error' to 'Error' type
-        console.error("Execution error:", err.message);
-        securityAnalysisProvider.updateSecurityAnalysis([`Test execution failed: ${err.message}`]);
-    }
-}
-    */
+/*
+1- write ur name beside the tests that you want to work on (2 or 3)
+2- create jira tickets for it 
+3- research and do it by next week 
+4- POSSIBLE IDEA : ADD HELPER METHODS SUCH AS CHECKKING INPUT SIZES HERE IF YOU THINK OTHERS CAN USE IT 
+5- first come first serve.
+*/
+
+// who wants to work on deploying ? @lim
+// Ask Fares if you need help to understand the code !
 
 // Main analysis function
 function analyzeCodeForSecurityIssues(code: string): string[] {
@@ -144,7 +122,7 @@ function checkBufferOverflowVulnerabilities(code: string): string[] {
     const issues: string[] = [];
     let match;
 
-    // Check for risky functions
+    // Check for risky functions 
     const riskyFunctions = ['strcpy', 'gets', 'sprintf'];
     riskyFunctions.forEach(func => {
         const regex = new RegExp(`\\b${func}\\b`);
@@ -230,6 +208,7 @@ while ((match = functionPattern.exec(code)) !== null) {
         );
     }
 }
+
 // Check for variable-length arrays (VLAs)
 const vlaPattern = /\bchar\s+\w+\[(\w+)\];/g;
 while ((match = vlaPattern.exec(code)) !== null) {
@@ -238,6 +217,7 @@ while ((match = vlaPattern.exec(code)) !== null) {
         `Warning: Variable-Length Array ${match[0]} detected. Use malloc/calloc for dynamic buffer allocation to prevent stack overflow.`
     );
 }
+
 
 // Check for unchecked return values of memory allocation functions
 const allocationFunctions = ['malloc', 'calloc', 'realloc'];

@@ -232,13 +232,28 @@ vscode.commands.registerCommand('extension.fetchCveDetails', async () => {
 **Description**: ${description}
 **Affected Products**:\n${affectedProducts}`;
 
-        vscode.window.showInformationMessage(formattedDetails, { modal: true });
-    } catch (error) {
+vscode.window.showInformationMessage(formattedDetails, { modal: true });
+} catch (error: any) {
+    // Handle known errors with specific status codes
+    if (error.response?.status === 404) {
+        vscode.window.showWarningMessage(
+            `CVE ID "${cveId}" is not listed in the database.`
+        );
+    } else if (error.response?.status === 400) {
+        vscode.window.showWarningMessage(
+            `CVE ID "${cveId}" is invalid. Please check the format.`
+        );
+    } else {
+        // Handle other errors
         vscode.window.showErrorMessage(
-            `Failed to fetch CVE details for ${cveId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+            `Failed to fetch CVE details for "${cveId}": ${
+                error instanceof Error ? error.message : 'Unknown error'
+            }`
         );
     }
+}
 });
+
 
 
 
