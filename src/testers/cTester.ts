@@ -506,7 +506,6 @@ function checkIntegerOverflowUnderflow(code: string): string[] {
 }
 
 
-//CODE FOR MIN
 // Path Traversal Vulnerability Checks
 function checkPathTraversalVulnerabilities(code: string): string[] {
     const issues: string[] = [];
