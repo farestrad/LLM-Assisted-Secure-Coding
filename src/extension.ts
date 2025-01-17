@@ -13,6 +13,8 @@ export function activate(context: vscode.ExtensionContext) {
     const aiSuggestionHistoryProvider = new AISuggestionHistoryProvider();
     const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
 
+
+
     // Register views
     vscode.window.registerTreeDataProvider('codeLlamaGeneratedCodeView', generatedCodeProvider);
     vscode.window.registerTreeDataProvider('securityAnalysisView', securityAnalysisProvider);
@@ -192,5 +194,29 @@ export function activate(context: vscode.ExtensionContext) {
         aiSuggestionHistoryProvider.refresh();
     });
 }
+
+
+vscode.commands.registerCommand('extension.fetchCveDetails', async () => {
+    const provider = new VulnerabilityDatabaseProvider();
+    const cveId = await vscode.window.showInputBox({
+        prompt: 'Enter the CVE ID to fetch details (e.g., CVE-2023-1234)',
+    });
+
+    if (!cveId) {
+        vscode.window.showWarningMessage('No CVE ID entered. Fetch operation canceled.');
+        return;
+    }
+
+    try {
+        const cveDetails = await provider.fetchCveDetails(cveId);
+        vscode.window.showInformationMessage(`CVE Details for ${cveId}: ${JSON.stringify(cveDetails, null, 2)}`);
+    } catch (error) {
+        vscode.window.showErrorMessage(
+            `Failed to fetch CVE details for ${cveId}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+    }
+});
+
+
 
 export function deactivate() {}
