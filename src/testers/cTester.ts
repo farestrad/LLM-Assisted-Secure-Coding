@@ -151,7 +151,7 @@ function checkBufferOverflowVulnerabilities(code: string): string[] {
 
 
 
-        // Check for small buffer declarations that could lead to off-by-one errors
+        // Check for small buffer declarations that could lead to off-by-one errors (ABOUD)
         const arrayPattern = /\bchar\s+\w+\[(\d+)\];/g;
         while ((match = arrayPattern.exec(code)) !== null) {
         const bufferSize = parseInt(match[1], 10);
@@ -160,7 +160,7 @@ function checkBufferOverflowVulnerabilities(code: string): string[] {
         }
     }
 
-    // Check for sprintf usage without bounds and snprintf exceeding buffer size
+    // Check for sprintf usage without bounds and snprintf exceeding buffer size (ABOUD)
 const sprintfPattern = /\b(sprintf|snprintf)\s*\(([^,]+),\s*(\d+)?\s*,\s*.+?\)/g;
 
 while ((match = sprintfPattern.exec(code)) !== null) {
@@ -187,7 +187,7 @@ while ((match = sprintfPattern.exec(code)) !== null) {
     }
 }
 
-// Check for recursive functions with local buffers (stack overflow risk)
+// Check for recursive functions with local buffers (stack overflow risk) (ABOUD)
 const recursivePattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*\bchar\s+(\w+)\[(\d+)\];[^}]*\b\1\s*\([^}]*\)/g;
 while ((match = recursivePattern.exec(code)) !== null) {
     const funcName = match[1];
