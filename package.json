@@ -1,6 +1,7 @@
 {
-  "name": "code-llama-integration",
-  "displayName": "Code Llama Integration",
+  "name": "SafeScript",
+  "publisher": "SafeScript",
+  "displayName": "SafeScript",
   "description": "Integrates Code Llama with VS Code for code analysis and security vulnerability checks.",
   "version": "0.0.1",
   "engines": {
