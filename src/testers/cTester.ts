@@ -219,7 +219,7 @@ while ((match = vlaPattern.exec(code)) !== null) {
 }
 
 
-// Check for unchecked return values of memory allocation functions
+// Check for unchecked return values of memory allocation functions 
 const allocationFunctions = ['malloc', 'calloc', 'realloc'];
 allocationFunctions.forEach(func => {
     const regex = new RegExp(`\\b${func}\\b`);
@@ -491,7 +491,7 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
     const issues: string[] = [];
     let match;
 
-    // Check for path traversal patterns (e.g., "../")
+    // Check for path traversal patterns (e.g., "../") (Minhyeok)
     const pathTraversalPattern = /\.\.\//g;
     if (pathTraversalPattern.test(code)) {
         issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
