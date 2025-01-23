@@ -497,7 +497,7 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
         issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
     }
 
-    // Check for risky functions that may lead to path traversal
+    // Check for risky functions that may lead to path traversal (Minhyeok)
     const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
     riskyFunctions.forEach(func => {
         const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+)\\)`, 'g');
