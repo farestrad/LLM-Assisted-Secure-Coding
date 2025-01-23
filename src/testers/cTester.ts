@@ -299,7 +299,7 @@ if (cryptoPattern.test(code)) {
     issues.push("Warning: Insecure cryptographic storage detected. Avoid using weak hashing algorithms.");
 }
 
-// Check for improper error handling and logging
+// Check for improper error handling and  logging (Minhyeok)
 const errorPattern = /\bprintf\(|fprintf\(|stderr|strerror\(/;
 if (errorPattern.test(code)) {
     issues.push("Warning: Improper error handling and logging detected. Ensure proper error messages and logging.");
