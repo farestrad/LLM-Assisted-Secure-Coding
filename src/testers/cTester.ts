@@ -509,7 +509,7 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
         }
     });
 
-    // Check for unsanitized input usage in file operations
+    // Check for unsanitized input usage in file operations (Minhyeok)
     const usagePattern = /\b(open|read|write|fread|fwrite)\s*\(([^,]+),?/g;
     while ((match = usagePattern.exec(code)) !== null) {
         const input = match[2].trim();
