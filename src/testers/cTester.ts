@@ -275,7 +275,7 @@ function checkRaceConditionVulnerabilities(code: string): string[] {
 function checkOtherVulnerabilities(code: string): string[] {
     const issues: string[] = [];
 
-    // Check for command injection
+    // Check for command injection (Minhyeok)
     const commandInjectionPattern = /system\(|popen\(|exec\(|fork\(|wait\(|systemp\(/;
     if (commandInjectionPattern.test(code)) {
         issues.push("Warning: Possible command injection vulnerability detected. Avoid using system calls with user input.");
