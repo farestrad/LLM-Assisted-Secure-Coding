@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import { exec } from 'child_process';
 import * as vscode from 'vscode';
 import { promisify } from 'util';
+import { cCodeParser } from '../parsers/cCodeParser'
 
 import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 
@@ -30,19 +31,7 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
     }
 
     
-    // Wrap the generated code with a main function for testing
-    /*
-    const testCode = `
-#include <stdio.h>
-#include <assert.h>
-
-${code}
-
-int main() {
-    return 0;
-}
-`;
-*/
+  
 const testCode = `
 ${code}
 `;
