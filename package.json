@@ -1,6 +1,7 @@
 {
-  "name": "code-llama-integration",
-  "displayName": "Code Llama Integration",
+  "name": "SafeScript",
+  "publisher": "SafeScript",
+  "displayName": "SafeScript",
   "description": "Integrates Code Llama with VS Code for code analysis and security vulnerability checks.",
   "version": "0.0.1",
   "engines": {
@@ -19,7 +20,7 @@
     "onCommand:extension.triggerAISuggestion",
     "onCommand:extension.acceptCodeChanges",
     "onCommand:extension.toggleAssistantSidebar",
-    "onCommand:extension.fetchCveDetails"  
+    "onCommand:extension.fetchCveDetails"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -65,7 +66,7 @@
         "title": "Test Security Analysis Panel"
       },
       {
-        "command": "extension.fetchCveDetails",  
+        "command": "extension.fetchCveDetails",
         "title": "Fetch CVE Details"
       }
     ],
@@ -86,7 +87,7 @@
         "when": "editorTextFocus"
       },
       {
-        "command": "extension.fetchCveDetails",  
+        "command": "extension.fetchCveDetails",
         "key": "ctrl+alt+c",
         "when": "editorTextFocus"
       }
@@ -104,7 +105,7 @@
           "group": "inline"
         },
         {
-          "command": "extension.fetchCveDetails",  
+          "command": "extension.fetchCveDetails",
           "when": "view == securityAnalysisView",
           "group": "inline"
         }
@@ -125,7 +126,7 @@
           "name": "AI Suggestions History"
         },
         {
-          "id": "cveDetailsView",  
+          "id": "cveDetailsView",
           "name": "CVE Details"
         }
       ]
@@ -139,12 +140,12 @@
           "default": "http://172.105.25.95:11434/api/generate",
           "description": "The base URL for the Code Llama API"
         },
-        "codeLlama.cveApiUrl": {  
+        "codeLlama.cveApiUrl": {
           "type": "string",
           "default": "https://cveawg.mitre.org/api/cve",
           "description": "The base URL for the CVE database API"
         },
-        "codeLlama.maxCveResults": {  
+        "codeLlama.maxCveResults": {
           "type": "number",
           "default": 10,
           "description": "The maximum number of CVE results to fetch"

@@ -151,7 +151,7 @@ function checkBufferOverflowVulnerabilities(code: string): string[] {
 
 
 
-        // Check for small buffer declarations that could lead to off-by-one errors
+        // Check for small buffer declarations that could lead to off-by-one errors (ABOUD)
         const arrayPattern = /\bchar\s+\w+\[(\d+)\];/g;
         while ((match = arrayPattern.exec(code)) !== null) {
         const bufferSize = parseInt(match[1], 10);
@@ -160,7 +160,7 @@ function checkBufferOverflowVulnerabilities(code: string): string[] {
         }
     }
 
-    // Check for sprintf usage without bounds and snprintf exceeding buffer size
+    // Check for sprintf usage without bounds and snprintf exceeding buffer size (ABOUD)
 const sprintfPattern = /\b(sprintf|snprintf)\s*\(([^,]+),\s*(\d+)?\s*,\s*.+?\)/g;
 
 while ((match = sprintfPattern.exec(code)) !== null) {
@@ -187,7 +187,7 @@ while ((match = sprintfPattern.exec(code)) !== null) {
     }
 }
 
-// Check for recursive functions with local buffers (stack overflow risk)
+// Check for recursive functions with local buffers (stack overflow risk) (ABOUD)
 const recursivePattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*\bchar\s+(\w+)\[(\d+)\];[^}]*\b\1\s*\([^}]*\)/g;
 while ((match = recursivePattern.exec(code)) !== null) {
     const funcName = match[1];
@@ -219,7 +219,7 @@ while ((match = vlaPattern.exec(code)) !== null) {
 }
 
 
-// Check for unchecked return values of memory allocation functions
+// Check for unchecked return values of memory allocation functions 
 const allocationFunctions = ['malloc', 'calloc', 'realloc'];
 allocationFunctions.forEach(func => {
     const regex = new RegExp(`\\b${func}\\b`);
@@ -275,7 +275,7 @@ function checkRaceConditionVulnerabilities(code: string): string[] {
 function checkOtherVulnerabilities(code: string): string[] {
     const issues: string[] = [];
 
-    // Check for command injection
+    // Check for command injection (Minhyeok)
     const commandInjectionPattern = /system\(|popen\(|exec\(|fork\(|wait\(|systemp\(/;
     if (commandInjectionPattern.test(code)) {
         issues.push("Warning: Possible command injection vulnerability detected. Avoid using system calls with user input.");
@@ -299,7 +299,7 @@ if (cryptoPattern.test(code)) {
     issues.push("Warning: Insecure cryptographic storage detected. Avoid using weak hashing algorithms.");
 }
 
-// Check for improper error handling and logging
+// Check for improper error handling and  logging (Minhyeok)
 const errorPattern = /\bprintf\(|fprintf\(|stderr|strerror\(/;
 if (errorPattern.test(code)) {
     issues.push("Warning: Improper error handling and logging detected. Ensure proper error messages and logging.");
@@ -491,13 +491,13 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
     const issues: string[] = [];
     let match;
 
-    // Check for path traversal patterns (e.g., "../")
+    // Check for path traversal patterns (e.g., "../") (Minhyeok)
     const pathTraversalPattern = /\.\.\//g;
     if (pathTraversalPattern.test(code)) {
         issues.push("Warning: Potential Path Traversal vulnerability detected. Avoid using relative paths with user input.");
     }
 
-    // Check for risky functions that may lead to path traversal
+    // Check for risky functions that may lead to path traversal (Minhyeok)
     const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
     riskyFunctions.forEach(func => {
         const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+)\\)`, 'g');
@@ -509,7 +509,7 @@ function checkPathTraversalVulnerabilities(code: string): string[] {
         }
     });
 
-    // Check for unsanitized input usage in file operations
+    // Check for unsanitized input usage in file operations (Minhyeok)
     const usagePattern = /\b(open|read|write|fread|fwrite)\s*\(([^,]+),?/g;
     while ((match = usagePattern.exec(code)) !== null) {
         const input = match[2].trim();
