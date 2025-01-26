@@ -1,8 +1,8 @@
 // CodeParser.ts
-export class CodeParser {
+export class cCodeParser {
     /**
      * Extracts methods/functions from the given code.
-     * @param code The raw C code as a string.
+     * @param code The raw C/C++ code as a string.
      * @returns Array of objects containing method name, parameters, and body.
      */
     static extractMethods(code: string): { name: string; parameters: string[]; body: string }[] {
