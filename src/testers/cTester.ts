@@ -639,4 +639,3 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
 
     return issues;
 }
-
