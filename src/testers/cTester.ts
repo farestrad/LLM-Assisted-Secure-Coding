@@ -117,6 +117,7 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
     // Check for buffer allocations without bounds checking
     const bufferRegex = /\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]\s*;/g;
+    
     while ((match = bufferRegex.exec(methodBody)) !== null) {
         const bufferName = match[1];
         if (!new RegExp(`sizeof\\(${bufferName}\\)`).test(methodBody)) {
@@ -128,6 +129,7 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
     // Check for malloc calls with insufficient size
     const mallocPattern = /\bmalloc\s*\(\s*(\d+|sizeof\s*\(\s*\w+\s*\))\s*\)/g;
+    
     while ((match = mallocPattern.exec(methodBody)) !== null) {
         const allocatedSize = parseInt(match[1], 10);
         if (allocatedSize < 100) {
@@ -139,6 +141,7 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
     // Check for small buffer declarations that could lead to off-by-one errors
     const arrayPattern = /\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]\s*;/g;
+    
     while ((match = arrayPattern.exec(methodBody)) !== null) {
         const bufferSize = parseInt(match[1], 10);
         if (bufferSize <= 10) {
@@ -150,6 +153,7 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
     // Check for sprintf usage without bounds and snprintf exceeding buffer size
     const sprintfPattern = /\b(sprintf|snprintf)\s*\(\s*([^,]+)\s*,\s*(\d+)?\s*,\s*.+?\)/g;
+    
     while ((match = sprintfPattern.exec(methodBody)) !== null) {
         const functionName = match[1];
         const bufferName = match[2];
@@ -176,6 +180,7 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
     // Check for recursive functions with local buffers (stack overflow risk)
     const recursivePattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*?\bchar\s+(\w+)\s*\[\s*(\d+)\s*\];[^}]*?\b\1\s*\([^}]*?\)/gs;
+    
     while ((match = recursivePattern.exec(methodBody)) !== null) {
         const funcName = match[1];
         issues.push(
@@ -185,6 +190,7 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
     // Check for functions with large local buffers (stack overflow risk in deeply nested calls)
     const functionPattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*?\bchar\s+(\w+)\s*\[\s*(\d+)\s*\];/gs;
+    
     const stackThreshold = 512; // Define a threshold for large buffer size
     while ((match = functionPattern.exec(methodBody)) !== null) {
         const funcName = match[1];
@@ -198,6 +204,7 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
     // Check for variable-length arrays (VLAs)
     const vlaPattern = /\bchar\s+(\w+)\s*\[\s*(\w+)\s*\]\s*;/g;
+    
     while ((match = vlaPattern.exec(methodBody)) !== null) {
         const sizeVariable = match[1];
         issues.push(
@@ -226,7 +233,8 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
     
 
     // Check for potential overflow in memcpy/memmove usage
-    const memcopyPattern = /\b(memcpy|memmove)\s*\(([^,]+),\s*([^,]+),\s*(\d+)\)/g;
+    const memcopyPattern = /\b(memcpy|memmove)\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*(\d+|sizeof\([^)]+\))\s*\)/g;
+
     while ((match = memcopyPattern.exec(methodBody)) !== null) {
         const bufferName = match[2];
         const copySize = parseInt(match[3], 10);
@@ -262,7 +270,7 @@ function checkRaceConditionVulnerabilities(methodBody: string, methodName: strin
     const issues: string[] = [];
 
     // Check for race condition in file access functions
-    const racePattern = /\b(fopen|fwrite|fread|fclose)\b/;
+    const racePattern = /\b(fopen|freopen|fwrite|fread|fclose|fprintf|fputs|fscanf)\s*\(/g;
     if (racePattern.test(methodBody)) {
         issues.push(
             `Warning: Improper file access detected in method "${methodName}". Ensure proper file locking to prevent race conditions.`
@@ -290,7 +298,7 @@ function checkOtherVulnerabilities(methodBody: string, methodName: string): stri
     const issues: string[] = [];
 
     // Check for command injection
-    const commandInjectionPattern = /system\(|popen\(|exec\(|fork\(|wait\(|systemp\(/;
+    const commandInjectionPattern = /\b(system|popen|exec|fork|wait|systemp)\s*\(/g;
     if (commandInjectionPattern.test(methodBody)) {
         issues.push(
             `Warning: Possible command injection vulnerability detected in method "${methodName}". Avoid using system calls with user input.`
@@ -298,7 +306,7 @@ function checkOtherVulnerabilities(methodBody: string, methodName: string): stri
     }
 
     // Check for hardcoded credentials
-    const hardCodedPattern = /\b(password|secret|apikey)\s*=\s*["'].*["']/;
+    const hardCodedPattern = /\b(password|secret|apikey|token|key)\s*=\s*["'].*["']/gi;
     if (hardCodedPattern.test(methodBody)) {
         issues.push(
             `Warning: Hardcoded credentials detected in method "${methodName}". Avoid hardcoding sensitive information.`
@@ -322,7 +330,7 @@ function checkOtherVulnerabilities(methodBody: string, methodName: string): stri
     }
 
     // Check for improper error handling and logging
-    const errorPattern = /\bprintf\(|fprintf\(|stderr|strerror\(/;
+    const errorPattern = /\b(printf|fprintf|stderr|strerror)\s*\(/;
     if (errorPattern.test(methodBody)) {
         issues.push(
             `Warning: Improper error handling and logging detected in method "${methodName}". Ensure proper error messages and logging.`
@@ -331,6 +339,7 @@ function checkOtherVulnerabilities(methodBody: string, methodName: string): stri
 
     // Check for improper input validation
     const inputPattern = /\batoi\(|atol\(|atof\(|gets\(|scanf\(/;
+    
     if (inputPattern.test(methodBody)) {
         issues.push(
             `Warning: Improper input validation detected in method "${methodName}". Ensure proper input validation and sanitization.`
@@ -338,7 +347,7 @@ function checkOtherVulnerabilities(methodBody: string, methodName: string): stri
     }
 
     // Check for improper privilege management
-    const privilegePattern = /\bsetuid\(|setgid\(|seteuid\(|setegid\(/;
+    const privilegePattern = /\b(setuid|setgid|seteuid|setegid)\s*\(/;
     if (privilegePattern.test(methodBody)) {
         issues.push(
             `Warning: Improper privilege management detected in method "${methodName}". Avoid using setuid, setgid, seteuid, and setegid.`
@@ -346,7 +355,7 @@ function checkOtherVulnerabilities(methodBody: string, methodName: string): stri
     }
 
     // Check for improper session management
-    const sessionPattern = /\bsession_start\(|session_id\(/;
+    const sessionPattern = /\b(session_start|session_id)\s*\(/;
     if (sessionPattern.test(methodBody)) {
         issues.push(
             `Warning: Improper session management detected in method "${methodName}". Ensure proper session handling.`
@@ -393,7 +402,7 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
     let match;
 
     // Look for password-related variables
-    const passwordPattern = /\b(pass|password|passwd|pwd|user_password|admin_password|auth_pass|login_password|secure_password|db_password|secret_key|passphrase|master_password)\b.*=/g;
+    const passwordPattern = /\b(pass|password|passwd|pwd|user_password|admin_password|auth_pass|login_password|secure_password|db_password|secret_key|passphrase|master_password)\b\s*=\s*["']?.+["']?/gi;
     while ((match = passwordPattern.exec(methodBody)) !== null) {
         const passwordVar = match[0];
         issues.push(
@@ -402,7 +411,7 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
     }
 
     // Look for file write operations involving password variables
-    const fileWritePattern = /\b(fwrite|fprintf|write|ofstream|fputs)\b\s*\(([^,]+),?/g;
+    const fileWritePattern = /\b(fwrite|fprintf|write|ofstream|fputs)\s*\(\s*[^,]+/g;
     while ((match = fileWritePattern.exec(methodBody)) !== null) {
         issues.push(
             `Warning: File write operation detected in method "${methodName}". Ensure sensitive data is encrypted before storage.`
@@ -420,7 +429,7 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
  * Helper function to check if input is sanitized in a method.
  */
 function isSanitized(input: string, methodBody: string): boolean {
-    const sanitizedPattern = new RegExp(`sanitize\\s*\\(\\s*${input}\\s*\\)`, 'g');
+    const sanitizedPattern = new RegExp(`\\b(sanitize|validate|escape)\\s*\\(\\s*${input}\\s*\\)`, 'i');
     return sanitizedPattern.test(methodBody);
 }
 
@@ -434,7 +443,7 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
     let match;
 
     // Detect insecure random functions
-    const insecureRandomPattern = /\b(rand|srand|random|drand48|lrand48|rand_r|random_r|srandom|srandom_r)\b/;
+    const insecureRandomPattern = /\b(rand|srand|random|drand48|lrand48|rand_r|random_r|srandom|srandom_r)\b\s*\(/g;
     if (insecureRandomPattern.test(methodBody)) {
         issues.push(
             `Warning: Insecure random number generator detected in method "${methodName}". Consider using secure alternatives or libraries.`
@@ -443,6 +452,7 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
 
     // Detect insecure seeding with time(NULL)
     const randomSeedPattern = /\bsrand\s*\(\s*time\s*\(\s*NULL\s*\)\s*\)/g;
+
     while ((match = randomSeedPattern.exec(methodBody)) !== null) {
         issues.push(
             `Warning: Using time(NULL) as a seed is insecure in method "${methodName}". Use a more secure seed source.`
@@ -450,7 +460,8 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
     }
 
     // Detect use of insecure RNG in loops
-    const loopPattern = /\b(rand|random|drand48|lrand48)\b.*?for\s*\(/g;
+    const loopPattern = /\b(rand|random|drand48|lrand48)\b.*?\bfor\s*\(/g;
+    
     while ((match = loopPattern.exec(methodBody)) !== null) {
         issues.push(
             `Warning: Insecure RNG '${match[1]}' detected in a loop in method "${methodName}". Ensure unbiased and secure random number generation.`
@@ -473,7 +484,7 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
     let match;
 
     // Detect weak hashing mechanisms
-    const weakHashPattern = /\b(md5|sha1|crypt)\b\s*\(/g;
+    const weakHashPattern = /\b(md5|sha1|crypt)\s*\(/gi;
     while ((match = weakHashPattern.exec(methodBody)) !== null) {
         const weakHash = match[1];
         issues.push(
@@ -482,7 +493,8 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
     }
 
     // Detect encryption usage for passwords
-    const encryptionPattern = /\b(encrypt|aes_encrypt|des_encrypt|blowfish_encrypt|crypto_encrypt|rsa_encrypt)\b\s*\(/gi;
+    const encryptionPattern = /\b(encrypt|aes_encrypt|des_encrypt|blowfish_encrypt|crypto_encrypt|rsa_encrypt)\s*\(/gi;
+    
     while ((match = encryptionPattern.exec(methodBody)) !== null) {
         const encryptionMethod = match[1];
         issues.push(
@@ -491,7 +503,8 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
     }
 
     // Detect direct calls to insecure hash libraries in code
-    const hashLibraryPattern = /\b#include\s*<openssl\/md5.h>|#include\s*<openssl\/sha.h>/g;
+    const hashLibraryPattern = /\b#include\s*<\s*(openssl\/md5\.h|openssl\/sha\.h)\s*>/g;
+   
     if (hashLibraryPattern.test(methodBody)) {
         issues.push(
             `Warning: Insecure hash library inclusion detected in method "${methodName}". Avoid using MD5 or SHA-1 from OpenSSL or similar libraries for password hashing.`
@@ -515,7 +528,7 @@ function checkInfiniteLoopsOrExcessiveResourceConsumption(methodBody: string, me
     let match;
 
     // Check for loops without clear termination
-    const infiniteLoopPattern = /\bfor\s*\([^;]*;\s*;[^)]*\)|\bwhile\s*\(true\)/g;
+    const infiniteLoopPattern = /\bfor\s*\([^;]*;\s*;[^)]*\)|\bwhile\s*\(\s*(true|1)\s*\)/gi;
     while ((match = infiniteLoopPattern.exec(methodBody)) !== null) {
         issues.push(
             `Warning: Potential infinite loop detected in method "${methodName}" at position ${match.index}. Ensure proper termination conditions.`
@@ -523,7 +536,7 @@ function checkInfiniteLoopsOrExcessiveResourceConsumption(methodBody: string, me
     }
 
     // Detect excessive memory allocations
-    const largeAllocationPattern = /\bmalloc\s*\(\s*(\d+)\s*\)|\bcalloc\s*\([^,]+,\s*(\d+)\)/g;
+    const largeAllocationPattern = /\bmalloc\s*\(\s*(\d+)\s*\)|\bcalloc\s*\(\s*[^,]+\s*,\s*(\d+)\s*\)/gi;
     while ((match = largeAllocationPattern.exec(methodBody)) !== null) {
         const allocatedSize = parseInt(match[1] || match[2], 10);
         if (allocatedSize > 1024 * 1024) { // Example threshold: 1 MB
@@ -605,7 +618,7 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
     let match;
 
     // Check for path traversal patterns (e.g., "../")
-    const pathTraversalPattern = /\.\.\//g;
+    const pathTraversalPattern = /\.\.\/|~\/|\\\.\.\\/g;
     if (pathTraversalPattern.test(methodBody)) {
         issues.push(
             `Warning: Potential Path Traversal vulnerability detected in method "${methodName}". Avoid using relative paths with user input.`
@@ -627,7 +640,9 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
     });
 
     // Check for unsanitized input usage in file operations
-    const usagePattern = /\b(open|read|write|fread|fwrite)\s*\(([^,]+),?/g;
+  
+    const usagePattern = /\b(open|read|write|fread|fwrite|unlink|rename)\s*\(([^,]+),?/g;
+    
     while ((match = usagePattern.exec(methodBody)) !== null) {
         const input = match[2].trim();
         if (!isSanitized(input, methodBody)) {
