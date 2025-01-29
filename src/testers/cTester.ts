@@ -102,99 +102,152 @@ async function fetchCveDetailsForIssues(issues: string[]): Promise<{ id: string;
  */
 function checkBufferOverflowVulnerabilities(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
-    const variables = new Map<string, number>(); // Stores buffer sizes
-    const validationChecks = new Set<string>();  // Tracks validated variables
+    const variables = new Map<string, number>();
+    const validationChecks = new Set<string>();
+    const calledFunctions = new Set<string>();
+    const validationFunctions = new Set<string>();
 
-    // **Phase 1: Track Buffer Declarations**
-    const declRegex = /\b(char|int|long)\s+(\w+)\s*\[\s*(\d+)\s*\]/g;
+    // Get configuration from VSCode
+    const config = vscode.workspace.getConfiguration('securityAnalysis');
+    const stackThreshold = config.get<number>('stackBufferThreshold', 512);
+
+    // Phase 1: Enhanced Buffer Declaration Tracking
+    const declRegex = /(\b(?:char|int|long|unsigned|signed|[\w_]+)\s+)+\s*(\w+)\s*\[\s*(\d+)\s*\]/g;
     let match;
     while ((match = declRegex.exec(methodBody)) !== null) {
         variables.set(match[2], parseInt(match[3], 10));
     }
 
-    // **Phase 2: Identify Validation Checks**
-    const validationRegex = /\b(if|while)\s*\(.*(strlen|sizeof)\s*\(\s*(\w+)\s*\).*[<>=]/g;
+    // Phase 2: Advanced Validation Check Detection
+    const validationRegex = /(?:\b(?:if|while|for)\s*\(|&&|\|\|).*\b(?:strlen|sizeof|_countof)\s*\(\s*(\w+)\s*\).*?(?:\)|;)/g;
     while ((match = validationRegex.exec(methodBody)) !== null) {
-        validationChecks.add(match[3]);
+        validationChecks.add(match[1]);
     }
 
-// **Phase 3: Analyze Risky Operations with Context**
-const functionChecks = [
-    {
-        pattern: /\b(strcpy|gets|sprintf)\s*\(\s*(\w+)\s*,/g,
-        handler: (fn: string, buffer: string) => {
-            if (!validationChecks.has(buffer)) {
-                return `Unvalidated ${fn} usage with "${buffer}"`;
-            }
-            return null;
-        }
-    },
-    {
-        pattern: /\bmalloc\s*\(\s*(\w+)\s*\)/g,
-        handler: (_: string, sizeVar: string) => {
-            if (!validationChecks.has(sizeVar)) {
-                return `Untrusted allocation size "${sizeVar}"`;
-            }
-            return null;
-        }
-    },
-    {
-        pattern: /\b(memcpy|memmove)\s*\(\s*(\w+)\s*,\s*\w+,\s*(\w+|sizeof\s*\(\s*\w+\s*\))\s*\)/g,
-        handler: (fn: string, destBuffer: string, sizeExpr: string) => {
-            const declaredSize = variables.get(destBuffer);
-            if (declaredSize && !sizeExpr.includes("sizeof") && parseInt(sizeExpr, 10) > declaredSize) {
-                return `Potential overflow: ${fn} copying ${sizeExpr} bytes into "${destBuffer}" (declared ${declaredSize} bytes)`;
-            }
-            return null;
-        }
-    }
-];
-
-functionChecks.forEach(({ pattern, handler }) => {
-    while ((match = pattern.exec(methodBody)) !== null) {
-        const msg = handler(match[1], match[2], match[3]);
-        if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
-    }
-});
-// **Phase 4: Check Recursive Functions with Local Buffers (Stack Overflow)**
-    const recursivePattern = new RegExp(`\\bvoid\\s+(\\w+)\\s*\\([^)]*\\)\\s*{[^}]*?\\bchar\\s+(\\w+)\\s*\\[\\s*(\\d+)\\s*\\];[^}]*?\\b\\1\\s*\\(`, 'gs');
-    while ((match = recursivePattern.exec(methodBody)) !== null) {
-        issues.push(`Warning: Recursive function "${match[1]}" with local buffer "${match[2]}" (${match[3]} bytes) may cause stack overflow in "${methodName}".`);
+    // Phase 3: Inter-procedural Validation Tracking
+    const valFuncRegex = /(?:bool|int)\s+(\w+)\s*\(.*\b(const char\s*\*|void\s*\*).*\)/g;
+    while ((match = valFuncRegex.exec(methodBody)) !== null) {
+        validationFunctions.add(match[1]);
     }
 
-    // **Phase 5: Detect Large Stack Allocations (Risky in Deep Recursion)**
-    const stackThreshold = 512; // Threshold for large buffer size
-    const largeBufferPattern = /\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]/g;
+    // Phase 4: Function Call Tracking
+    const callRegex = /\b(\w+)\s*\(/g;
+    while ((match = callRegex.exec(methodBody)) !== null) {
+        calledFunctions.add(match[1]);
+    }
+
+    // Phase 5: Context-Aware Risky Function Analysis
+    const functionChecks = [
+        {
+            pattern: /\b(strcpy|gets|sprintf)\s*\(\s*(\w+)\s*,/g,
+            handler: (fn: string, buffer: string) => {
+                if (!validationChecks.has(buffer) && !isValidatedByFunction(buffer)) {
+                    return `Unvalidated ${fn} usage with "${buffer}"`;
+                }
+                return null;
+            }
+        },
+        {
+            pattern: /\bmalloc\s*\(\s*(\w+)\s*\)/g,
+            handler: (_: string, sizeVar: string) => {
+                if (!validationChecks.has(sizeVar)) {
+                    return `Untrusted allocation size "${sizeVar}"`;
+                }
+                return null;
+            }
+        },
+        {
+            pattern: /\b(memcpy|memmove)\s*\(\s*(\w+)\s*,\s*\w+,\s*([^)]+)\s*\)/g,
+            handler: (fn: string, destBuffer: string, sizeExpr: string) => {
+                const declaredSize = variables.get(destBuffer);
+                const sizeValue = parseSizeExpression(sizeExpr);
+                
+                if (declaredSize && sizeValue && sizeValue > declaredSize) {
+                    return `${fn} copying ${sizeValue} bytes into "${destBuffer}" (${declaredSize} bytes)`;
+                }
+                return null;
+            }
+        }
+    ];
+
+    functionChecks.forEach(({ pattern, handler }) => {
+        while ((match = pattern.exec(methodBody)) !== null) {
+            const msg = handler(match[1], match[2], match[3]);
+            if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
+        }
+    });
+
+    // Phase 6: Recursive Function Analysis
+    if (calledFunctions.has(methodName)) {
+        const localBuffers = Array.from(variables.keys()).join(', ');
+        if (localBuffers) {
+            issues.push(`Warning: Recursive function "${methodName}" with local buffers (${localBuffers})`);
+        }
+    }
+
+    // Phase 7: Stack Allocation Analysis
+    const largeBufferPattern = /\b(char|int|long)\s+(\w+)\s*\[\s*(\d+)\s*\]/g;
     while ((match = largeBufferPattern.exec(methodBody)) !== null) {
-        const bufferSize = parseInt(match[2], 10);
+        const bufferSize = parseInt(match[3], 10);
         if (bufferSize > stackThreshold) {
-            issues.push(`Warning: Large local buffer "${match[1]}" (${bufferSize} bytes) in "${methodName}" may cause stack overflow.`);
+            issues.push(`Warning: Large stack buffer "${match[2]}" (${bufferSize} bytes) in "${methodName}"`);
         }
     }
 
-    // **Phase 6: Detect Unchecked Memory Allocation Returns**
+    // Phase 8: Pointer Arithmetic Checks
+    const pointerRegex = /\b(\w+)\s*(\+|\-)=\s*\d+/g;
+    while ((match = pointerRegex.exec(methodBody)) !== null) {
+        if (variables.has(match[1])) {
+            issues.push(`Warning: Pointer arithmetic on buffer "${match[1]}" in "${methodName}"`);
+        }
+    }
+
+    // Phase 9: Array Index Validation
+    const indexRegex = /\b(\w+)\s*\[\s*(\w+)\s*\]/g;
+    while ((match = indexRegex.exec(methodBody)) !== null) {
+        const [buffer, index] = [match[1], match[2]];
+        if (!validationChecks.has(index)) {
+            issues.push(`Warning: Unvalidated index "${index}" used with "${buffer}" in "${methodName}"`);
+        }
+    }
+
+    // Phase 10: Memory Allocation Checks
     const allocationFunctions = ['malloc', 'calloc', 'realloc'];
     allocationFunctions.forEach((func) => {
         const allocationRegex = new RegExp(`\\b${func}\\s*\\(`, 'g');
         const checkedRegex = new RegExp(`if\\s*\\(\\s*${func}\\s*\\(`);
 
-        let match;
         while ((match = allocationRegex.exec(methodBody)) !== null) {
             if (!checkedRegex.test(methodBody)) {
-                issues.push(`Warning: Unchecked return value of "${func}" detected in "${methodName}". Ensure memory allocation success.`);
+                issues.push(`Warning: Unchecked return value of "${func}" in "${methodName}"`);
             }
         }
     });
 
-    
+    // Helper Functions
+    function parseSizeExpression(expr: string): number | null {
+        // Handle sizeof() expressions
+        const sizeofMatch = expr.match(/sizeof\s*\(\s*(\w+)\s*\)/);
+        if (sizeofMatch) return variables.get(sizeofMatch[1]) || null;
 
- // **Check for Small Buffers that May Cause Off-by-One Errors**
-    const smallBufferThreshold = 10; // Small buffer size threshold
-    variables.forEach((size, name) => {
-        if (size <= smallBufferThreshold) {
-            issues.push(`Warning: Possible off-by-one error with buffer "${name}" (${size} bytes) in "${methodName}". Ensure adequate space for null terminator.`);
+        // Handle arithmetic expressions
+        if (expr.includes('+') || expr.includes('*')) {
+            try {
+                return eval(expr.replace(/\b(\w+)\b/g, (_, v) => variables.get(v)?.toString() || '0'));
+            } catch {
+                return null;
+            }
         }
-    });
+
+        // Handle numeric literals and variables
+        return parseInt(expr, 10) || variables.get(expr) || null;
+    }
+
+    function isValidatedByFunction(buffer: string): boolean {
+        return Array.from(validationFunctions).some(fn => 
+            new RegExp(`\\b${fn}\\s*\\(\\s*${buffer}\\s*\\)`).test(methodBody)
+        );
+    }
 
     return issues;
 }
