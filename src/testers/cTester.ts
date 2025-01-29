@@ -102,7 +102,21 @@ async function fetchCveDetailsForIssues(issues: string[]): Promise<{ id: string;
  */
 function checkBufferOverflowVulnerabilities(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
+    const variables = new Map<string, number>(); // Stores buffer sizes
+    const validationChecks = new Set<string>();  // Tracks validated variables
+
+    // **Phase 1: Track Buffer Declarations**
+    const declRegex = /\b(char|int|long)\s+(\w+)\s*\[\s*(\d+)\s*\]/g;
     let match;
+    while ((match = declRegex.exec(methodBody)) !== null) {
+        variables.set(match[2], parseInt(match[3], 10));
+    }
+
+    // **Phase 2: Identify Validation Checks**
+    const validationRegex = /\b(if|while)\s*\(.*(strlen|sizeof)\s*\(\s*(\w+)\s*\).*[<>=]/g;
+    while ((match = validationRegex.exec(methodBody)) !== null) {
+        validationChecks.add(match[3]);
+    }
 
     // Check for risky functions
     const riskyFunctions = ['strcpy', 'gets', 'sprintf'];
