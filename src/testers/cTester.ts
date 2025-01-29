@@ -118,153 +118,44 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
         validationChecks.add(match[3]);
     }
 
-    // Check for risky functions
-    const riskyFunctions = ['strcpy', 'gets', 'sprintf'];
-    riskyFunctions.forEach((func) => {
-        const regex = new RegExp(`\\b${func}\\s*\\(.*\\)`, 'g');
-        if (regex.test(methodBody)) {
-            issues.push(
-                `Warning: Use of ${func} detected in method "${methodName}". Consider using safer alternatives (e.g., strncpy, fgets, snprintf).`
-            );
-        }
-    });
-
-    // Check for buffer allocations without bounds checking
-    const bufferRegex = /\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]\s*;/g;
-    
-    while ((match = bufferRegex.exec(methodBody)) !== null) {
-        const bufferName = match[1];
-        if (!new RegExp(`sizeof\\(${bufferName}\\)`).test(methodBody)) {
-            issues.push(
-                `Warning: Buffer "${bufferName}" in method "${methodName}" does not include bounds checking. Use sizeof(${bufferName}) to prevent overflow.`
-            );
-        }
-    }
-
-    // Check for malloc calls with insufficient size
-    const mallocPattern = /\bmalloc\s*\(\s*(\d+|sizeof\s*\(\s*\w+\s*\))\s*\)/g;
-    
-    while ((match = mallocPattern.exec(methodBody)) !== null) {
-        const allocatedSize = parseInt(match[1], 10);
-        if (allocatedSize < 100) {
-            issues.push(
-                `Warning: Potentially insufficient memory allocation with malloc in method "${methodName}". Ensure buffer size is adequate.`
-            );
-        }
-    }
-
-    // Check for small buffer declarations that could lead to off-by-one errors
-    const arrayPattern = /\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]\s*;/g;
-    
-    while ((match = arrayPattern.exec(methodBody)) !== null) {
-        const bufferSize = parseInt(match[1], 10);
-        if (bufferSize <= 10) {
-            issues.push(
-                `Warning: Possible off-by-one error with buffer size ${bufferSize} in method "${methodName}". Ensure adequate space for null terminator.`
-            );
-        }
-    }
-
-    // Check for sprintf usage without bounds and snprintf exceeding buffer size
-    const sprintfPattern = /\b(sprintf|snprintf)\s*\(\s*([^,]+)\s*,\s*(\d+)?\s*,\s*.+?\)/g;
-    
-    while ((match = sprintfPattern.exec(methodBody)) !== null) {
-        const functionName = match[1];
-        const bufferName = match[2];
-
-        if (functionName === 'sprintf') {
-            issues.push(
-                `Warning: Use of sprintf detected with buffer "${bufferName}" in method "${methodName}". Prefer snprintf for bounded writing.`
-            );
-        } else if (functionName === 'snprintf') {
-            const specifiedBound = parseInt(match[3], 10);
-            const bufferRegex = new RegExp(`\\bchar\\s+${bufferName}\\[(\\d+)\\];`);
-            const bufferMatch = bufferRegex.exec(methodBody);
-
-            if (bufferMatch) {
-                const bufferSize = parseInt(bufferMatch[1], 10);
-                if (specifiedBound > bufferSize) {
-                    issues.push(
-                        `Warning: snprintf usage with buffer "${bufferName}" in method "${methodName}" exceeds buffer size. Reduce the size parameter.`
-                    );
-                }
+// **Phase 3: Analyze Risky Operations with Context**
+const functionChecks = [
+    {
+        pattern: /\b(strcpy|gets|sprintf)\s*\(\s*(\w+)\s*,/g,
+        handler: (fn: string, buffer: string) => {
+            if (!validationChecks.has(buffer)) {
+                return `Unvalidated ${fn} usage with "${buffer}"`;
             }
+            return null;
         }
-    }
-
-    // Check for recursive functions with local buffers (stack overflow risk)
-    const recursivePattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*?\bchar\s+(\w+)\s*\[\s*(\d+)\s*\];[^}]*?\b\1\s*\([^}]*?\)/gs;
-    
-    while ((match = recursivePattern.exec(methodBody)) !== null) {
-        const funcName = match[1];
-        issues.push(
-            `Warning: Recursive function "${funcName}" with local buffer detected in method "${methodName}". Ensure recursion depth is limited to prevent stack overflow.`
-        );
-    }
-
-    // Check for functions with large local buffers (stack overflow risk in deeply nested calls)
-    const functionPattern = /\bvoid\s+(\w+)\s*\([^)]*\)\s*{[^}]*?\bchar\s+(\w+)\s*\[\s*(\d+)\s*\];/gs;
-    
-    const stackThreshold = 512; // Define a threshold for large buffer size
-    while ((match = functionPattern.exec(methodBody)) !== null) {
-        const funcName = match[1];
-        const bufferSize = parseInt(match[3], 10);
-        if (bufferSize > stackThreshold) {
-            issues.push(
-                `Warning: Function "${funcName}" in method "${methodName}" has a large local buffer (${bufferSize} bytes). Excessive nested calls may lead to stack overflow.`
-            );
-        }
-    }
-
-    // Check for variable-length arrays (VLAs)
-    const vlaPattern = /\bchar\s+(\w+)\s*\[\s*(\w+)\s*\]\s*;/g;
-    
-    while ((match = vlaPattern.exec(methodBody)) !== null) {
-        const sizeVariable = match[1];
-        issues.push(
-            `Warning: Variable-Length Array "${sizeVariable}" detected in method "${methodName}". Use malloc/calloc for dynamic buffer allocation to prevent stack overflow.`
-        );
-    }
-
-    // Check for unchecked return values of memory allocation functions
-    const allocationFunctions = ['malloc', 'calloc', 'realloc'];
-    allocationFunctions.forEach((func) => {
-        // Match allocation calls
-        const allocationRegex = new RegExp(`\\b${func}\\s*\\(`, 'g');
-        // Match `if` checks for the allocation
-        const checkedRegex = new RegExp(`if\\s*\\(\\s*${func}\\s*\\(`);
-    
-        // Search for allocation calls
-        let match;
-        while ((match = allocationRegex.exec(methodBody)) !== null) {
-            if (!checkedRegex.test(methodBody)) {
-                issues.push(
-                    `Warning: Unchecked return value of ${func} detected in method "${methodName}". Ensure memory allocation success.`
-                );
+    },
+    {
+        pattern: /\bmalloc\s*\(\s*(\w+)\s*\)/g,
+        handler: (_: string, sizeVar: string) => {
+            if (!validationChecks.has(sizeVar)) {
+                return `Untrusted allocation size "${sizeVar}"`;
             }
+            return null;
         }
-    });
-    
-
-    // Check for potential overflow in memcpy/memmove usage
-    const memcopyPattern = /\b(memcpy|memmove)\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*(\d+|sizeof\([^)]+\))\s*\)/g;
-
-    while ((match = memcopyPattern.exec(methodBody)) !== null) {
-        const bufferName = match[2];
-        const copySize = parseInt(match[3], 10);
-
-        // Check the buffer size if it's declared in the code
-        const bufferDeclarationRegex = new RegExp(`\\bchar\\s+${bufferName}\\[(\\d+)\\];`);
-        const bufferMatch = bufferDeclarationRegex.exec(methodBody);
-        if (bufferMatch) {
-            const bufferSize = parseInt(bufferMatch[1], 10);
-            if (copySize > bufferSize) {
-                issues.push(
-                    `Warning: Potential overflow in ${match[1]} usage with buffer "${bufferName}" in method "${methodName}". Ensure copy size is within buffer bounds.`
-                );
+    },
+    {
+        pattern: /\b(memcpy|memmove)\s*\(\s*(\w+)\s*,\s*\w+,\s*(\w+|sizeof\s*\(\s*\w+\s*\))\s*\)/g,
+        handler: (fn: string, destBuffer: string, sizeExpr: string) => {
+            const declaredSize = variables.get(destBuffer);
+            if (declaredSize && !sizeExpr.includes("sizeof") && parseInt(sizeExpr, 10) > declaredSize) {
+                return `Potential overflow: ${fn} copying ${sizeExpr} bytes into "${destBuffer}" (declared ${declaredSize} bytes)`;
             }
+            return null;
         }
     }
+];
+
+functionChecks.forEach(({ pattern, handler }) => {
+    while ((match = pattern.exec(methodBody)) !== null) {
+        const msg = handler(match[1], match[2], match[3]);
+        if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
+    }
+});
 
     return issues;
 }
