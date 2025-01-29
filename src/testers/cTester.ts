@@ -162,9 +162,33 @@ functionChecks.forEach(({ pattern, handler }) => {
         issues.push(`Warning: Recursive function "${match[1]}" with local buffer "${match[2]}" (${match[3]} bytes) may cause stack overflow in "${methodName}".`);
     }
 
+    // **Phase 5: Detect Large Stack Allocations (Risky in Deep Recursion)**
+    const stackThreshold = 512; // Threshold for large buffer size
+    const largeBufferPattern = /\bchar\s+(\w+)\s*\[\s*(\d+)\s*\]/g;
+    while ((match = largeBufferPattern.exec(methodBody)) !== null) {
+        const bufferSize = parseInt(match[2], 10);
+        if (bufferSize > stackThreshold) {
+            issues.push(`Warning: Large local buffer "${match[1]}" (${bufferSize} bytes) in "${methodName}" may cause stack overflow.`);
+        }
+    }
+
+    // **Phase 6: Detect Unchecked Memory Allocation Returns**
+    const allocationFunctions = ['malloc', 'calloc', 'realloc'];
+    allocationFunctions.forEach((func) => {
+        const allocationRegex = new RegExp(`\\b${func}\\s*\\(`, 'g');
+        const checkedRegex = new RegExp(`if\\s*\\(\\s*${func}\\s*\\(`);
+
+        let match;
+        while ((match = allocationRegex.exec(methodBody)) !== null) {
+            if (!checkedRegex.test(methodBody)) {
+                issues.push(`Warning: Unchecked return value of "${func}" detected in "${methodName}". Ensure memory allocation success.`);
+            }
+        }
+    });
 
     return issues;
 }
+
 
 
 
