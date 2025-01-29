@@ -156,6 +156,12 @@ functionChecks.forEach(({ pattern, handler }) => {
         if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
     }
 });
+// **Phase 4: Check Recursive Functions with Local Buffers (Stack Overflow)**
+    const recursivePattern = new RegExp(`\\bvoid\\s+(\\w+)\\s*\\([^)]*\\)\\s*{[^}]*?\\bchar\\s+(\\w+)\\s*\\[\\s*(\\d+)\\s*\\];[^}]*?\\b\\1\\s*\\(`, 'gs');
+    while ((match = recursivePattern.exec(methodBody)) !== null) {
+        issues.push(`Warning: Recursive function "${match[1]}" with local buffer "${match[2]}" (${match[3]} bytes) may cause stack overflow in "${methodName}".`);
+    }
+
 
     return issues;
 }
