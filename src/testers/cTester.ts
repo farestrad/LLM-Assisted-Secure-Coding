@@ -196,16 +196,6 @@ functionChecks.forEach(({ pattern, handler }) => {
         }
     });
 
-    
-
-
-    
-
-
-
-
-
-
     return issues;
 }
 
