@@ -186,6 +186,26 @@ functionChecks.forEach(({ pattern, handler }) => {
         }
     });
 
+    
+
+ // **Check for Small Buffers that May Cause Off-by-One Errors**
+    const smallBufferThreshold = 10; // Small buffer size threshold
+    variables.forEach((size, name) => {
+        if (size <= smallBufferThreshold) {
+            issues.push(`Warning: Possible off-by-one error with buffer "${name}" (${size} bytes) in "${methodName}". Ensure adequate space for null terminator.`);
+        }
+    });
+
+    
+
+
+    
+
+
+
+
+
+
     return issues;
 }
 
