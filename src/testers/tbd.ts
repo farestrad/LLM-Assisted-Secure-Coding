@@ -1180,3 +1180,67 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
 }
 
 */
+
+
+
+/*
+import * as fs from 'fs';
+import * as vscode from 'vscode';
+import { promisify } from 'util';
+import { cCodeParser } from '../parsers/cCodeParser';
+import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
+//import { cCodeParser, MethodInfo } from '../parsers/cCodeParser';
+
+
+const execPromise = promisify(require('child_process').exec);
+const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
+
+// Define the file path, with a fallback to `/tmp` if no workspace is open
+const tempFilePath = vscode.workspace.workspaceFolders
+    ? `${vscode.workspace.workspaceFolders[0].uri.fsPath}/temp_test_code.c`
+    : `/tmp/temp_test_code.c`;
+
+/**
+ * Main function to analyze C code for vulnerabilities.
+ 
+export async function runCTests(code: string, securityAnalysisProvider: any) {
+    try {
+        // Step 1: Extract methods from Clang AST instead of regex
+        const methods: MethodInfo[] = await cCodeParser.extractMethodsFromAST(code);
+
+        // Step 2: Analyze the entire code using Clang AST
+        cCodeParser.getClangAST(code, async (ast) => {
+            if (!ast) {
+                console.error("Clang AST parsing failed.");
+                securityAnalysisProvider.updateSecurityAnalysis(["Error: Failed to parse AST."]);
+                return;
+            }
+
+            // Step 3: Analyze each method using the security analysis provider
+            const securityIssues: string[] = [];
+            methods.forEach((method) => {
+                securityIssues.push(...securityAnalysisProvider.analyzeAST(method.ast));
+            });
+
+            // Step 4: Fetch CVE details if vulnerabilities are found
+            if (securityIssues.length > 0) {
+                const cveDetails = await fetchCveDetailsForIssues(securityIssues);
+                securityAnalysisProvider.updateCveDetails(cveDetails);
+            }
+
+            // Step 5: Update the security analysis provider with found issues
+            securityAnalysisProvider.updateSecurityAnalysis(securityIssues);
+        });
+
+        // Optional: Write test code to a file (if needed for debugging)
+        fs.writeFileSync(tempFilePath, code);
+        console.log(`Test code written to ${tempFilePath}`);
+    } catch (error) {
+        // Handle errors safely
+        console.error('Error in runCTests:', error instanceof Error ? error.message : error);
+        securityAnalysisProvider.updateSecurityAnalysis([
+            `Error during testing: ${error instanceof Error ? error.message : String(error)}`,
+        ]);
+    }
+}
+*/

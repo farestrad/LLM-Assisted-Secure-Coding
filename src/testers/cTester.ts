@@ -51,6 +51,7 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
 }
 
 
+
 /**
  * Analyze a single method for security vulnerabilities.
  */
