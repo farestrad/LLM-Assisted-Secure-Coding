@@ -615,7 +615,7 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
     const issues: string[] = [];
     let match;
 
-    // Check for path traversal patterns (e.g., "../")
+    // Check for path traversal patterns (e.g., "../") (Minhyeok)
     const pathTraversalPattern = /\.\.\/|~\/|\\\.\.\\/g;
     if (pathTraversalPattern.test(methodBody)) {
         issues.push(
