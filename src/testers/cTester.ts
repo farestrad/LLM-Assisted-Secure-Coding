@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { promisify } from 'util';
 import { cCodeParser } from '../parsers/cCodeParser';
 import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
+//import { parseCCode } from '../parsers/cParser';
 
 const execPromise = promisify(require('child_process').exec);
 const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
@@ -261,7 +262,8 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
 
 
-///////////
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
 
 
 
