@@ -256,112 +256,6 @@ function checkBufferOverflowVulnerabilities(methodBody: string, methodName: stri
 
 
 
-//////////
-
-
-
-
-/**
- * Check for race condition vulnerabilities in a method.
- */
-function checkRaceConditionVulnerabilities(methodBody: string, methodName: string): string[] {
-    const issues: string[] = [];
-
-    // Check for race condition in file access functions
-    const racePattern = /\b(fopen|freopen|fwrite|fread|fclose|fprintf|fputs|fscanf)\s*\(/g;
-    if (racePattern.test(methodBody)) {
-        issues.push(
-            `Warning: Improper file access detected in method "${methodName}". Ensure proper file locking to prevent race conditions.`
-        );
-    }
-
-    return issues;
-}
-
-
-
-
-/////////
-
-
-
-
-/**
- * Check for other vulnerabilities in a method.
- */
-/**
- * Check for other vulnerabilities in a method.
- */
-function checkOtherVulnerabilities(methodBody: string, methodName: string): string[] {
-    const issues: string[] = [];
-
-    // Check for command injection
-    const commandInjectionPattern = /\b(system|popen|exec|fork|wait|systemp)\s*\(/g;
-    if (commandInjectionPattern.test(methodBody)) {
-        issues.push(
-            `Warning: Possible command injection vulnerability detected in method "${methodName}". Avoid using system calls with user input.`
-        );
-    }
-
-    // Check for hardcoded credentials
-    const hardCodedPattern = /\b(password|secret|apikey|token|key)\s*=\s*["'].*["']/gi;
-    if (hardCodedPattern.test(methodBody)) {
-        issues.push(
-            `Warning: Hardcoded credentials detected in method "${methodName}". Avoid hardcoding sensitive information.`
-        );
-    }
-
-    // Check for improper authentication handling
-    const authPattern = /\b(==|!=)\s*["'].*["']/;
-    if (authPattern.test(methodBody)) {
-        issues.push(
-            `Warning: Improper authentication handling detected in method "${methodName}". Avoid using string comparison for sensitive data.`
-        );
-    }
-
-    // Check for insecure cryptographic storage
-    const cryptoPattern = /\bMD5\b|\bSHA1\b/;
-    if (cryptoPattern.test(methodBody)) {
-        issues.push(
-            `Warning: Insecure cryptographic storage detected in method "${methodName}". Avoid using weak hashing algorithms.`
-        );
-    }
-
-    // Check for improper error handling and logging
-    const errorPattern = /\b(printf|fprintf|stderr|strerror)\s*\(/;
-    if (errorPattern.test(methodBody)) {
-        issues.push(
-            `Warning: Improper error handling and logging detected in method "${methodName}". Ensure proper error messages and logging.`
-        );
-    }
-
-    // Check for improper input validation
-    const inputPattern = /\batoi\(|atol\(|atof\(|gets\(|scanf\(/;
-    
-    if (inputPattern.test(methodBody)) {
-        issues.push(
-            `Warning: Improper input validation detected in method "${methodName}". Ensure proper input validation and sanitization.`
-        );
-    }
-
-    // Check for improper privilege management
-    const privilegePattern = /\b(setuid|setgid|seteuid|setegid)\s*\(/;
-    if (privilegePattern.test(methodBody)) {
-        issues.push(
-            `Warning: Improper privilege management detected in method "${methodName}". Avoid using setuid, setgid, seteuid, and setegid.`
-        );
-    }
-
-    // Check for improper session management
-    const sessionPattern = /\b(session_start|session_id)\s*\(/;
-    if (sessionPattern.test(methodBody)) {
-        issues.push(
-            `Warning: Improper session management detected in method "${methodName}". Ensure proper session handling.`
-        );
-    }
-
-    return issues;
-}
 
 
 
@@ -522,6 +416,122 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
     return issues;
 }
  
+
+
+
+
+//////////
+
+
+
+
+
+//////////
+
+
+
+
+/**
+ * Check for race condition vulnerabilities in a method.
+ */
+function checkRaceConditionVulnerabilities(methodBody: string, methodName: string): string[] {
+    const issues: string[] = [];
+
+    // Check for race condition in file access functions
+    const racePattern = /\b(fopen|freopen|fwrite|fread|fclose|fprintf|fputs|fscanf)\s*\(/g;
+    if (racePattern.test(methodBody)) {
+        issues.push(
+            `Warning: Improper file access detected in method "${methodName}". Ensure proper file locking to prevent race conditions.`
+        );
+    }
+
+    return issues;
+}
+
+
+
+
+/////////
+
+
+
+
+/**
+ * Check for other vulnerabilities in a method.
+ */
+/**
+ * Check for other vulnerabilities in a method.
+ */
+function checkOtherVulnerabilities(methodBody: string, methodName: string): string[] {
+    const issues: string[] = [];
+
+    // Check for command injection
+    const commandInjectionPattern = /\b(system|popen|exec|fork|wait|systemp)\s*\(/g;
+    if (commandInjectionPattern.test(methodBody)) {
+        issues.push(
+            `Warning: Possible command injection vulnerability detected in method "${methodName}". Avoid using system calls with user input.`
+        );
+    }
+
+    // Check for hardcoded credentials
+    const hardCodedPattern = /\b(password|secret|apikey|token|key)\s*=\s*["'].*["']/gi;
+    if (hardCodedPattern.test(methodBody)) {
+        issues.push(
+            `Warning: Hardcoded credentials detected in method "${methodName}". Avoid hardcoding sensitive information.`
+        );
+    }
+
+    // Check for improper authentication handling
+    const authPattern = /\b(==|!=)\s*["'].*["']/;
+    if (authPattern.test(methodBody)) {
+        issues.push(
+            `Warning: Improper authentication handling detected in method "${methodName}". Avoid using string comparison for sensitive data.`
+        );
+    }
+
+    // Check for insecure cryptographic storage
+    const cryptoPattern = /\bMD5\b|\bSHA1\b/;
+    if (cryptoPattern.test(methodBody)) {
+        issues.push(
+            `Warning: Insecure cryptographic storage detected in method "${methodName}". Avoid using weak hashing algorithms.`
+        );
+    }
+
+    // Check for improper error handling and logging
+    const errorPattern = /\b(printf|fprintf|stderr|strerror)\s*\(/;
+    if (errorPattern.test(methodBody)) {
+        issues.push(
+            `Warning: Improper error handling and logging detected in method "${methodName}". Ensure proper error messages and logging.`
+        );
+    }
+
+    // Check for improper input validation
+    const inputPattern = /\batoi\(|atol\(|atof\(|gets\(|scanf\(/;
+    
+    if (inputPattern.test(methodBody)) {
+        issues.push(
+            `Warning: Improper input validation detected in method "${methodName}". Ensure proper input validation and sanitization.`
+        );
+    }
+
+    // Check for improper privilege management
+    const privilegePattern = /\b(setuid|setgid|seteuid|setegid)\s*\(/;
+    if (privilegePattern.test(methodBody)) {
+        issues.push(
+            `Warning: Improper privilege management detected in method "${methodName}". Avoid using setuid, setgid, seteuid, and setegid.`
+        );
+    }
+
+    // Check for improper session management
+    const sessionPattern = /\b(session_start|session_id)\s*\(/;
+    if (sessionPattern.test(methodBody)) {
+        issues.push(
+            `Warning: Improper session management detected in method "${methodName}". Ensure proper session handling.`
+        );
+    }
+
+    return issues;
+}
 
 ///////
 
