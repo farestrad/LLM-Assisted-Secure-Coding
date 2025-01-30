@@ -623,7 +623,7 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
         );
     }
 
-    // Check for risky functions that may lead to path traversal
+    // Check for risky functions that may lead to path traversal (MInhyeok)
     const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
     riskyFunctions.forEach((func) => {
         const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+)\\)`, 'g');
