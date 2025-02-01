@@ -507,7 +507,7 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
 
 
 /**
- * Check for race condition vulnerabilities in a method.
+ * Check for race condition vulnerabilities in a method. (Minhyeok)
  */
 function checkRaceConditionVulnerabilities(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
