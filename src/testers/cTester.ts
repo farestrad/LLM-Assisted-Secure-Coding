@@ -571,9 +571,6 @@ function checkRaceConditionVulnerabilities(methodBody: string, methodName: strin
 /**
  * Check for other vulnerabilities in a method.
  */
-/**
- * Check for other vulnerabilities in a method.
- */
 function checkOtherVulnerabilities(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
 
