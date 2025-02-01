@@ -413,10 +413,12 @@ function checkHeapOverflowVulnerabilities(methodBody: string, methodName: string
 
 
 /**
- * Analyze a method for potential plaintext password vulnerabilities.
+ * Analyze a method for potential plaintext password vulnerabilities. (Minhyeok)
  */
 function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
+    const passwordVariables = new Set<string>();
+    const fileWriteOperations = new Set<string>();
     let match;
 
     // Look for password-related variables
