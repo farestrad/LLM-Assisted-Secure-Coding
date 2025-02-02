@@ -844,7 +844,7 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
     const issues: string[] = [];
     let match;
 
-    // Check for path traversal patterns (e.g., "../") (Minhyeok)
+    // Check for path traversal patterns (e.g., "../") 
     const pathTraversalPattern = /\.\.\/|~\/|\\\.\.\\/g;
     if (pathTraversalPattern.test(methodBody)) {
         issues.push(
@@ -852,7 +852,7 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
         );
     }
 
-    // Check for risky functions that may lead to path traversal (MInhyeok)
+    // Check for risky functions that may lead to path traversal 
     const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
     riskyFunctions.forEach((func) => {
         const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+)\\)`, 'g');
@@ -866,7 +866,7 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
         }
     });
 
-    // Check for unsanitized input usage in file operations (Minhyeok)
+    // Check for unsanitized input usage in file operations 
     const usagePattern = /\b(open|read|write|fread|fwrite|unlink|rename)\s*\(([^,]+),?/g;
     
     while ((match = usagePattern.exec(methodBody)) !== null) {
