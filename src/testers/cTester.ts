@@ -557,8 +557,14 @@ function checkRaceConditionVulnerabilities(methodBody: string, methodName: strin
     //         `Warning: Improper file access detected in method "${methodName}". Ensure proper file locking to prevent race conditions.`
     //     );
     // }
+<<<<<<< Updated upstream
     
     return issues;
+=======
+
+    return issues;
+ 
+>>>>>>> Stashed changes
 }
 
 
