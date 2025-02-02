@@ -417,13 +417,8 @@ function checkHeapOverflowVulnerabilities(methodBody: string, methodName: string
  */
 function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
-<<<<<<< Updated upstream
     const passwordVariables = new Set<string>();
     const fileWriteOperations = new Set<string>();
-=======
-
-    let match;
->>>>>>> Stashed changes
 
     const config = vscode.workspace.getConfiguration('securityAnalysis');
     const passwordKeywords = config.get<string[]>('passwordkeywords', ['pass', 'password', 'passwd', 'pwd', 'user_password', 'admin_password', 
@@ -433,6 +428,7 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
     // Phase 1: Password Variable Detection
     const passwordPattern = new RegExp(`\\b(${passwordKeywords.join('|')})\\b\\s*=\\s*["']?.+["']?`, 'gi');
     let match;
+    
     while ((match = passwordPattern.exec(methodBody)) !== null) {
         const passwordVar = match[0];
         passwordVariables.add(match[0]);
@@ -553,23 +549,16 @@ function checkRaceConditionVulnerabilities(methodBody: string, methodName: strin
     if (fileAccessFuctions.size > 0 && !hasFileLock) {
         issues.push('Warning: File access detected without proper file locking in method "${methodName}". Ensure proper file locking to prevent issues.');
     }
-<<<<<<< Updated upstream
 
     // // Check for race condition in file access functions
-=======
->>>>>>> Stashed changes
     // const racePattern = /\b(fopen|freopen|fwrite|fread|fclose|fprintf|fputs|fscanf)\s*\(/g;
     // if (racePattern.test(methodBody)) {
     //     issues.push(
     //         `Warning: Improper file access detected in method "${methodName}". Ensure proper file locking to prevent race conditions.`
     //     );
     // }
-<<<<<<< Updated upstream
- 
-=======
-
+    
     return issues;
->>>>>>> Stashed changes
 }
 
 
