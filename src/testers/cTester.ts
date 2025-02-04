@@ -663,7 +663,13 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
     const issues: string[] = [];
     const riskyFunctions = new Set<string>();
     const insecureSeeds = new Set<string>();
+
     let match;
+
+    const config = vscode.workspace.getConfiguration('securityAnalysis');
+    const secureRandomFunctions = config.get<string[]>('secureRandomFunctions', ['rand_s', 'rand_r', 'random_r', 'arc4random', 'getrandom', 'CryptGenRandom']);
+    const secureSeeds = config.get<string[]>('secureSeeds', ['getrandom', 'CryptGenRandom']);
+    const loopFunctions = config.get<string[]>('loopFunctions', ['rand', 'random', 'drand48', 'lrand48']);
 
     // Detect insecure random functions
     const insecureRandomPattern = /\b(rand|srand|random|drand48|lrand48|rand_r|random_r|srandom|srandom_r)\b\s*\(/g;
