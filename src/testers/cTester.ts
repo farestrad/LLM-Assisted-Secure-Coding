@@ -657,7 +657,7 @@ function isSanitized(input: string, methodBody: string): boolean {
 
 
 /**
- * Check for insecure random number generation in a method.
+ * Check for insecure random number generation in a method. (Minhyeok)
  */
 function checkRandomNumberGeneration(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
