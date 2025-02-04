@@ -661,6 +661,8 @@ function isSanitized(input: string, methodBody: string): boolean {
  */
 function checkRandomNumberGeneration(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
+    const riskyFunctions = new Set<string>();
+    const insecureSeeds = new Set<string>();
     let match;
 
     // Detect insecure random functions
