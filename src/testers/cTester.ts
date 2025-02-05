@@ -570,10 +570,21 @@ function checkRaceConditionVulnerabilities(methodBody: string, methodName: strin
 
 
 /**
- * Check for other vulnerabilities in a method.
+ * Check for other vulnerabilities in a method. (Minhyeok)
  */
 function checkOtherVulnerabilities(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
+    const vulnerabilities = new Map<string, Set<String>>();
+
+    // Get configuration from VSCode
+    const config = vscode.workspace.getConfiguration('securityAnalysis');
+    const commandInjectionFunctions = config.get<string[]>('commandInjectionFunctions', ['system', 'popen', 'exec', 'fork', 'wait', 'systemp']);
+    const hardcodedCredentialsKeywords = config.get<string[]>('hardcodedCredentialsKeywords', ['password', 'secret', 'apikey', 'token', 'key']);
+    const weakCryptoAlgorithms = config.get<string[]>('weakCryptoAlgorithms', ['MD5', 'SHA1']);
+    const improperInputFunctions = config.get<string[]>('improperInputFunctions', ['atoi', 'atol', 'atof', 'gets', 'scanf']);
+    const improperPrivilegeFunctions = config.get<string[]>('improperPrivilegeFunctions', ['setuid', 'setgid', 'seteuid', 'setegid']);
+    const improperSessionFunctions = config.get<string[]>('improperSessionFunctions', ['session_start', 'session_id']);
+
 
     // Check for command injection
     const commandInjectionPattern = /\b(system|popen|exec|fork|wait|systemp)\s*\(/g;
@@ -649,10 +660,10 @@ function checkOtherVulnerabilities(methodBody: string, methodName: string): stri
 /**
  * Helper function to check if input is sanitized in a method.
  */
-function isSanitized(input: string, methodBody: string): boolean {
-    const sanitizedPattern = new RegExp(`\\b(sanitize|validate|escape)\\s*\\(\\s*${input}\\s*\\)`, 'i');
-    return sanitizedPattern.test(methodBody);
-}
+// function isSanitized(input: string, methodBody: string): boolean {
+//     const sanitizedPattern = new RegExp(`\\b(sanitize|validate|escape)\\s*\\(\\s*${input}\\s*\\)`, 'i');
+//     return sanitizedPattern.test(methodBody);
+// }
 
 
 
