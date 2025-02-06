@@ -1116,3 +1116,126 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
 
     return issues;
 }
+
+
+/*
+import * as fs from 'fs';
+import * as vscode from 'vscode';
+import { promisify } from 'util';
+import { cCodeParser } from '../parsers/cCodeParser';
+import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
+
+// Import individual security checks
+import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
+import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
+import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
+import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
+import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
+import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
+import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
+import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
+import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
+import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
+
+// Instantiate security check classes
+const bufferOverflowCheck = new BufferOverflowCheck();
+const heapOverflowCheck = new HeapOverflowCheck();
+const plaintextPasswordCheck = new PlaintextPasswordCheck();
+const raceConditionCheck = new RaceConditionCheck();
+const otherVulnerabilitiesCheck = new OtherVulnerabilitiesCheck();
+const randomNumberGenerationCheck = new RandomNumberGenerationCheck();
+const weakHashingEncryptionCheck = new WeakHashingEncryptionCheck();
+const infiniteLoopCheck = new InfiniteLoopCheck();
+const integerOverflowCheck = new IntegerFlowCheck();
+const pathTraversalCheck = new PathTraversalCheck();
+
+const execPromise = promisify(require('child_process').exec);
+const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
+
+// Define the file path, with a fallback to `/tmp` if no workspace is open
+const tempFilePath = vscode.workspace.workspaceFolders
+    ? `${vscode.workspace.workspaceFolders[0].uri.fsPath}/temp_test_code.c`
+    : `/tmp/temp_test_code.c`;
+
+/**
+ * Main function to analyze C code for vulnerabilities.
+ 
+export async function runCTests(code: string, securityAnalysisProvider: any) {
+    try {
+        // Step 1: Extract methods from the code
+        const methods = cCodeParser.extractMethods(code);
+
+        // Step 2: Analyze each method for vulnerabilities
+        const securityIssues: string[] = [];
+        methods.forEach((method) => {
+            securityIssues.push(...analyzeMethodForSecurityIssues(method));
+        });
+
+        // Step 3: Fetch CVE details if vulnerabilities are found
+        if (securityIssues.length > 0) {
+            const cveDetails = await fetchCveDetailsForIssues(securityIssues);
+            securityAnalysisProvider.updateCveDetails(cveDetails);
+        }
+
+        // Step 4: Update the security analysis provider with found issues
+        securityAnalysisProvider.updateSecurityAnalysis(securityIssues);
+
+        // Optional: Write test code to a file
+        fs.writeFileSync(tempFilePath, code);
+        console.log(`Test code written to ${tempFilePath}`);
+    } catch (error) {
+        // Safely handle the error by checking its type
+        if (error instanceof Error) {
+            console.error('Error in runCTests:', error.message);
+            securityAnalysisProvider.updateSecurityAnalysis([`Error during testing: ${error.message}`]);
+        } else {
+            console.error('Unexpected error in runCTests:', error);
+            securityAnalysisProvider.updateSecurityAnalysis([`Unexpected error during testing: ${String(error)}`]);
+        }
+    }
+}
+
+/**
+ * Analyze a single method for security vulnerabilities.
+ 
+function analyzeMethodForSecurityIssues(method: { name: string; parameters: string[]; body: string }): string[] {
+    const issues: string[] = [];
+
+    // Run each security check and collect issues
+    issues.push(...bufferOverflowCheck.check(method.body, method.name)); // 3
+    issues.push(...heapOverflowCheck.check(method.body, method.name)); // 4
+    issues.push(...plaintextPasswordCheck.check(method.body, method.name)); // 1
+    issues.push(...raceConditionCheck.check(method.body, method.name)); // 9
+    issues.push(...otherVulnerabilitiesCheck.check(method.body, method.name)); // 7
+    issues.push(...randomNumberGenerationCheck.check(method.body, method.name)); // 10
+    issues.push(...weakHashingEncryptionCheck.check(method.body, method.name)); // 2
+    issues.push(...infiniteLoopCheck.check(method.body, method.name)); // 5
+    issues.push(...integerOverflowCheck.check(method.body, method.name)); // 6
+    issues.push(...pathTraversalCheck.check(method.body, method.name)); // 8
+
+    return issues;
+}
+
+/**
+ * Fetch CVE details for identified security issues.
+ 
+async function fetchCveDetailsForIssues(issues: string[]): Promise<{ id: string; description: string }[]> {
+    const cveDetails: { id: string; description: string }[] = [];
+
+    for (const issue of issues) {
+        try {
+            const cves = await vulnerabilityDatabaseProvider.fetchMultipleCveDetails(issue);
+            cves.forEach((cve: any) => {
+                cveDetails.push({
+                    id: cve.id,
+                    description: cve.descriptions[0]?.value || 'No description available',
+                });
+            });
+        } catch (error) {
+            console.error(`Error fetching CVEs for "${issue}":`, error);
+        }
+    }
+
+    return cveDetails;
+}
+*/
