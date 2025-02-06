@@ -848,11 +848,18 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
 function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
     const weakHashes = new Set<string>();
-    const encryptionMethods = new Set<string>();
+    const insecureEncryptionMethods = new Set<string>();
+    const insecureHashLibraries = new Set<string>();
     let match;
 
+    // Get configuration from VSCode
+    const config = vscode.workspace.getConfiguration('securityAnalysis');
+    const weakHashAlgorithms = config.get<string[]>('weakHashAlgorithms', ['md5', 'sha1', 'crypt']);
+    const weakEncryptionMethods = config.get<string[]>('weakEncryptionMethods', ['encrypt', 'aes_encrypt', 'des_encrypt', 'blowfish_encrypt', 'crypto_encrypt', 'rsa_encrypt']);
+    const insecureHashLibrariesList = config.get<string[]>('insecureHashLibraries', ['openssl/md5.h', 'openssl/sha.h']);
+
     // Detect weak hashing mechanisms
-    const weakHashPattern = /\b(md5|sha1|crypt)\s*\(/gi;
+    const weakHashPattern = new RegExp(`\\b(${weakHashAlgorithms.join('|')})\\s*\\(`, 'gi');
     while ((match = weakHashPattern.exec(methodBody)) !== null) {
         const weakHash = match[1];
         weakHashes.add(weakHash);
@@ -860,17 +867,17 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
     }
 
     // Detect encryption usage for passwords
-    const encryptionPattern = /\b(encrypt|aes_encrypt|des_encrypt|blowfish_encrypt|crypto_encrypt|rsa_encrypt)\s*\(/gi;
+    const encryptionPattern = new RegExp(`\\b(${weakEncryptionMethods.join('|')})\\s*\\(`, 'gi');
     while ((match = encryptionPattern.exec(methodBody)) !== null) {
         const encryptionMethod = match[1];
-        encryptionMethods.add(encryptionMethod);
+        insecureEncryptionMethods.add(encryptionMethod);
         issues.push(
             `Warning: Passwords should not be encrypted using ${encryptionMethod} in method "${methodName}". Use a secure hashing algorithm (e.g., bcrypt, Argon2) instead.`
         );
     }
 
     // Detect direct calls to insecure hash libraries in code
-    const hashLibraryPattern = /\b#include\s*<\s*(openssl\/md5\.h|openssl\/sha\.h)\s*>/g;
+    const hashLibraryPattern = new RegExp(`\\b(${insecureHashLibrariesList.join('|')})\\b`, 'gi');
     if (hashLibraryPattern.test(methodBody)) {
         issues.push(
             `Warning: Insecure hash library inclusion detected in method "${methodName}". Avoid using MD5 or SHA-1 from OpenSSL or similar libraries for password hashing.`
