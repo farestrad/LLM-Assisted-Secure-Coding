@@ -843,26 +843,27 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
 
 
 /**
- * Analyze a method for weak hashing and encryption vulnerabilities.
+ * Analyze a method for weak hashing and encryption vulnerabilities. (Minhyeok)
  */
 function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
+    const weakHashes = new Set<string>();
+    const encryptionMethods = new Set<string>();
     let match;
 
     // Detect weak hashing mechanisms
     const weakHashPattern = /\b(md5|sha1|crypt)\s*\(/gi;
     while ((match = weakHashPattern.exec(methodBody)) !== null) {
         const weakHash = match[1];
-        issues.push(
-            `Warning: Weak hashing algorithm (${weakHash}) detected in method "${methodName}". Consider using a strong hash function like bcrypt, scrypt, or Argon2.`
-        );
+        weakHashes.add(weakHash);
+        issues.push(`Warning: Weak hashing algorithm (${weakHash}) detected in method "${methodName}". Consider using a strong hash function like bcrypt, scrypt, or Argon2.`);
     }
 
     // Detect encryption usage for passwords
     const encryptionPattern = /\b(encrypt|aes_encrypt|des_encrypt|blowfish_encrypt|crypto_encrypt|rsa_encrypt)\s*\(/gi;
-    
     while ((match = encryptionPattern.exec(methodBody)) !== null) {
         const encryptionMethod = match[1];
+        encryptionMethods.add(encryptionMethod);
         issues.push(
             `Warning: Passwords should not be encrypted using ${encryptionMethod} in method "${methodName}". Use a secure hashing algorithm (e.g., bcrypt, Argon2) instead.`
         );
@@ -870,7 +871,6 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
 
     // Detect direct calls to insecure hash libraries in code
     const hashLibraryPattern = /\b#include\s*<\s*(openssl\/md5\.h|openssl\/sha\.h)\s*>/g;
-   
     if (hashLibraryPattern.test(methodBody)) {
         issues.push(
             `Warning: Insecure hash library inclusion detected in method "${methodName}". Avoid using MD5 or SHA-1 from OpenSSL or similar libraries for password hashing.`
@@ -887,7 +887,7 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
 
 
 /**
- * Check for infinite loops or excessive resource consumption in a method.
+ * Check for infinite loops or excessive resource consumption in a method. (Minhyeok)
  */
 function checkInfiniteLoopsOrExcessiveResourceConsumption(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
@@ -923,7 +923,7 @@ function checkInfiniteLoopsOrExcessiveResourceConsumption(methodBody: string, me
 
 
 /**
- * Check for integer overflow and underflow vulnerabilities in a method.
+ * Check for integer overflow and underflow vulnerabilities in a method. (Minhyeok)
  */
 function checkIntegerOverflowUnderflow(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
