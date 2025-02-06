@@ -893,6 +893,13 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
 
 
 
+
+
+
+
+
+
+
 /**
  * Check for infinite loops or excessive resource consumption in a method. (Minhyeok)
  */
