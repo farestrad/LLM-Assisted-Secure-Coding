@@ -905,21 +905,30 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
  */
 function checkInfiniteLoopsOrExcessiveResourceConsumption(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
+    const infiniteLoops = new Set<string>();
+    const largeAllocations = new Set<string>();
     let match;
 
+    const config = vscode.workspace.getConfiguration('securityAnalysis');
+    const infiniteLoopPatterns = config.get<string[]>('infiniteLoopPatterns', ['for\\s*\\([^;]*;\\s*;[^)]*\\)', 'while\\s*\\(\\s*(true|1)\\s*\\)']);
+    const largeAllocationThreshold = config.get<number>('largeAllocationThreshold', 1024 * 1024); // Example threshold: 1 MB
+    
     // Check for loops without clear termination
-    const infiniteLoopPattern = /\bfor\s*\([^;]*;\s*;[^)]*\)|\bwhile\s*\(\s*(true|1)\s*\)/gi;
+    const infiniteLoopPattern = new RegExp(`\\b(${infiniteLoopPatterns.join('|')})\\s*{`, 'gi');
     while ((match = infiniteLoopPattern.exec(methodBody)) !== null) {
+        const loop = match[0];
+        infiniteLoops.add(loop);
         issues.push(
             `Warning: Potential infinite loop detected in method "${methodName}" at position ${match.index}. Ensure proper termination conditions.`
         );
     }
 
     // Detect excessive memory allocations
-    const largeAllocationPattern = /\bmalloc\s*\(\s*(\d+)\s*\)|\bcalloc\s*\(\s*[^,]+\s*,\s*(\d+)\s*\)/gi;
+    const largeAllocationPattern = new RegExp(`\\b(malloc|calloc|realloc)\\s*\\(\\s*(\\d+)\\s*\\)`, 'gi');
     while ((match = largeAllocationPattern.exec(methodBody)) !== null) {
         const allocatedSize = parseInt(match[1] || match[2], 10);
-        if (allocatedSize > 1024 * 1024) { // Example threshold: 1 MB
+        if (allocatedSize > largeAllocationThreshold) { // Example threshold: 1 MB
+            largeAllocations.add('${match[1]}(${match[2]})');
             issues.push(
                 `Warning: Excessive memory allocation (${allocatedSize} bytes) detected in method "${methodName}". Review memory usage.`
             );
