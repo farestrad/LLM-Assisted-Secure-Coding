@@ -9,7 +9,7 @@ import { promisify } from 'util';
 /**
  * Check for infinite loops or excessive resource consumption in a method. (Minhyeok)
  */
-export class checkInfiniteLoopsOrExcessiveResourceConsumption {
+export class InfiniteLoopCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         let match;

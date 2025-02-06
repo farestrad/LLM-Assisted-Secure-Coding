@@ -7,7 +7,7 @@ import { promisify } from 'util';
 /**
  * Check for path traversal vulnerabilities in a method. (Minhyeok)
  */
-export class checkPathTraversalVulnerabilities{
+export class PathTraversalCheck{
     check(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
     const riskyPaths = new Set<string>();

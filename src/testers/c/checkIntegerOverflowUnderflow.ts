@@ -10,7 +10,7 @@ import { promisify } from 'util';
 /**
  * Check for integer overflow and underflow vulnerabilities in a method. (Minhyeok)
  */
-export class checkIntegerOverflowUnderflow{
+export class IntegerFlowCheck{
     check (methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
     const overflowPattern = /\b(\w+)\s*=\s*([\d\-]+)\s*([\+\-\*\/])\s*([\d\-]+)/g;
