@@ -453,7 +453,7 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
         }
     },
     {
-        pattern: /\b(log|console\.log|System\.out\.println))\s*\(\s*([^]+)\s*\)/g,
+        pattern: /\b(log|console\.log|System\.out\.println)\s*\(\s*([^]+)\s*\)/g,
         handler: (fn: string, arg: string) => {
             if (passwordVariables.has(arg)) {
                 return `Potential plaintext password logged by ${fn}`;
