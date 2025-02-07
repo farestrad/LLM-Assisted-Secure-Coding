@@ -34,10 +34,10 @@ const securityChecks: SecurityCheck[] = [
 const execPromise = promisify(require('child_process').exec);
 const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
 
-// Define the file path, with a fallback to `/tmp` if no workspace is open
-const tempFilePath = vscode.workspace.workspaceFolders
-    ? `${vscode.workspace.workspaceFolders[0].uri.fsPath}/temp_test_code.c`
-    : `/tmp/temp_test_code.c`;
+// // Define the file path, with a fallback to `/tmp` if no workspace is open
+// const tempFilePath = vscode.workspace.workspaceFolders
+//     ? `${vscode.workspace.workspaceFolders[0].uri.fsPath}/temp_test_code.c`
+//     : `/tmp/temp_test_code.c`;
 
 /**
  * Main function to analyze C code for vulnerabilities.
@@ -62,9 +62,9 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
         // Step 4: Update the security analysis provider with found issues
         securityAnalysisProvider.updateSecurityAnalysis(securityIssues);
 
-        // Optional: Write test code to a file
-        fs.writeFileSync(tempFilePath, code);
-        console.log(`Test code written to ${tempFilePath}`);
+        // // Optional: Write test code to a file
+        // fs.writeFileSync(tempFilePath, code);
+        // console.log(`Test code written to ${tempFilePath}`);
     } catch (error) {
         // Safely handle the error by checking its type
         if (error instanceof Error) {
