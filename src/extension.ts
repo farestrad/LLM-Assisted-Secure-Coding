@@ -23,53 +23,32 @@ export function activate(context: vscode.ExtensionContext) {
     // Command: Run Security Analysis
     vscode.commands.registerCommand('extension.runSecurityAnalysis', async () => {
         const editor = vscode.window.activeTextEditor;
-
+    
         if (!editor) {
             vscode.window.showWarningMessage('No active editor found. Please open a file to analyze.');
             return;
         }
-
+    
         const code = editor.document.getText();
         if (!code) {
             vscode.window.showWarningMessage('No code found in the editor. Please write some code to analyze.');
             return;
         }
-
-        // Clear existing results in the Security Analysis panel
+    
+        // Use the instance of SecurityAnalysisProvider instead of the class
         securityAnalysisProvider.clear();
-
+    
         // Run security analysis
         vscode.window.showInformationMessage('Running security analysis...');
         await securityAnalysisProvider.analyzeLatestGeneratedCode();
-
-        // Fetch CVE details based on detected issues
-        const detectedIssues = securityAnalysisProvider['securityIssues']; // Access detected issues
-
-        if (detectedIssues.length > 0) {
-            try {
-                const cveDetails = [];
-                for (const issue of detectedIssues) {
-                    // Ensure issue.label is a string
-                    const issueLabel = typeof issue.label === 'string' ? issue.label : 'Unknown Issue';
-        
-                    // Fetch CVE details using the validated string label
-                    const fetchedCves = await vulnerabilityDatabaseProvider.fetchMultipleCveDetails(issueLabel);
-        
-                    // Map fetched CVEs into the desired format and add them to the list
-                    cveDetails.push(...fetchedCves.map(cve => ({
-                        id: cve.id,
-                        description: cve.descriptions[0]?.value || 'No description available',
-                    })));
-                }
-        
-                // Update CVE details in the Security Analysis panel
-                securityAnalysisProvider.updateCveDetails(cveDetails);
-                vscode.window.showInformationMessage('CVE details fetched and updated successfully.');
-            } catch (error) {
-                vscode.window.showErrorMessage(
-                    `Failed to fetch CVE details: ${error instanceof Error ? error.message : 'Unknown error'}`
-                );
-            }
+    
+        // Get security issues from the provider instance
+        const detectedIssues = await securityAnalysisProvider.getChildren(
+            new vscode.TreeItem('Security Issues', vscode.TreeItemCollapsibleState.Collapsed)
+        );
+    
+        if (detectedIssues.length > 0 && detectedIssues[0].label !== "No security issues found!") {
+            vscode.window.showInformationMessage('Security analysis completed. Check the Security Analysis panel for results.');
         } else {
             vscode.window.showInformationMessage('No security issues detected.');
         }
