@@ -2,6 +2,7 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { promisify } from 'util';
+import { SecurityCheck } from "../c/SecurityCheck";
 //import { cCodeParser } from '../parsers/cCodeParser';
 //import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 //import { parseCCode } from '../parsers/cParser';
@@ -10,7 +11,7 @@ import { promisify } from 'util';
 /**
  * Analyze a method for potential plaintext password vulnerabilities. (Minhyeok)
  */
-export class PlaintextPasswordCheck {
+export class PlaintextPasswordCheck implements SecurityCheck{
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         const passwordVariables = new Set<string>();

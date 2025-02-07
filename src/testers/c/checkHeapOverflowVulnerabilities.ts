@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { promisify } from 'util';
+import { SecurityCheck } from "../c/SecurityCheck";
 //import { cCodeParser } from '../parsers/cCodeParser';
 //import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 //import { parseCCode } from '../parsers/cParser';
@@ -8,7 +9,7 @@ import { promisify } from 'util';
 /**
  * Check for heap overflow vulnerabilities in a method.
  */
-export class HeapOverflowCheck {
+export class HeapOverflowCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         const heapAllocations = new Map<string, { size: string; line: number }>();

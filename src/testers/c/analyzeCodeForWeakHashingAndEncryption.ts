@@ -1,10 +1,11 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { promisify } from 'util';
+import { SecurityCheck } from "../c/SecurityCheck";
 //import { cCodeParser } from '../parsers/cCodeParser';
 //import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 //import { parseCCode } from '../parsers/cParser';
-export class WeakHashingEncryptionCheck {
+export class WeakHashingEncryptionCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         const weakHashes = new Set<string>();

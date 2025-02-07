@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { promisify } from 'util';
+import { SecurityCheck } from "../c/SecurityCheck";
 //import { cCodeParser } from '../parsers/cCodeParser';
 //import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 //import { parseCCode } from '../parsers/cParser';
@@ -8,8 +9,8 @@ import { promisify } from 'util';
 
 /**
  * Check for other vulnerabilities in a method. (Minhyeok)
- */
-export class OtherVulnerabilitiesCheck {
+ **/
+export class OtherVulnerabilitiesCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         const vulnerabilities = new Map<string, Set<string>>();
@@ -173,8 +174,9 @@ export class OtherVulnerabilitiesCheck {
 
 /**
  * Helper function to check if input is sanitized in a method.
- */
+ 
 // function isSanitized(input: string, methodBody: string): boolean {
 //     const sanitizedPattern = new RegExp(`\\b(sanitize|validate|escape)\\s*\\(\\s*${input}\\s*\\)`, 'i');
 //     return sanitizedPattern.test(methodBody);
 // }
+*/

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { promisify } from 'util';
+import { SecurityCheck } from "../c/SecurityCheck";
 //import { cCodeParser } from '../parsers/cCodeParser';
 //import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 //import { parseCCode } from '../parsers/cParser';
@@ -7,7 +8,7 @@ import { promisify } from 'util';
 /**
  * Check for path traversal vulnerabilities in a method. (Minhyeok)
  */
-export class PathTraversalCheck{
+export class PathTraversalCheck implements SecurityCheck{
     check(methodBody: string, methodName: string): string[] {
     const issues: string[] = [];
     const riskyPaths = new Set<string>();
