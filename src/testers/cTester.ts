@@ -422,24 +422,42 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
 
     const config = vscode.workspace.getConfiguration('securityAnalysis');
     const passwordKeywords = config.get<string[]>('passwordkeywords', ['pass', 'password', 'passwd', 'pwd', 'user_password', 'admin_password', 
-        'auth_pass', 'login_password', 'secure_password', 'db_password', 'secret_key', 'passphrase', 'master_password'
-    ]);
+        'auth_pass', 'login_password', 'secure_password', 'db_password', 'secret_key', 'passphrase', 'master_password' ]);
+    let match;
 
     // Phase 1: Password Variable Detection
     const passwordPattern = new RegExp(`\\b(${passwordKeywords.join('|')})\\b\\s*=\\s*["']?.+["']?`, 'gi');
-    let match;
-    
-    while ((match = passwordPattern.exec(methodBody)) !== null) {
-        const passwordVar = match[0];
-        passwordVariables.add(match[0]);
-        issues.push( 'Warning: Potential password variable (' + passwordVar + ') detected in method "' + methodName + '". Ensure it is not stored in plaintext.');
+    try {
+        while ((match = passwordPattern.exec(methodBody)) !== null) {
+            const passwordVar = match[0];
+            passwordVariables.add(passwordVar);
+            issues.push(`Warning: Potential password variable (${passwordVar}) detected in method "${methodName}". Ensure it is not stored in plaintext.`);
+        }
+    } catch (error) {
+        console.error(`Error in password variable detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        passwordPattern.lastIndex = 0;
     }
 
     // Phase 2: File Write Operation Detection
     const fileWritePattern = /\b(fwrite|fprintf|write|ofstream|fputs)\s*\(\s*[^,]+/g;
-    while ((match = fileWritePattern.exec(methodBody)) !== null) {
-        fileWriteOperations.add(match[0]);
-        issues.push('Warning: File write operation detected in method "' + methodName + '". Ensure sensitive data is encrypted before storage.');
+    try {
+        while ((match = fileWritePattern.exec(methodBody)) !== null) {
+            const fileOp = match[1];
+            const argument = match[2];
+            fileWriteOperations.add(fileOp);
+            if (isPasswordVariable(argument)) {
+                issues.push(`Warning: Potential plaintext password written to file using "${fileOp} in method "${argument}". Ensure sensitive data is encrypted before storage.`);
+            } else {
+            issues.push(`Warning: File write operation detected in method "${methodName}". Ensure sensitive data is encrypted before storage.`);
+            }
+        }
+    } catch (error) {
+        console.error(`Error in file write operation detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        fileWritePattern.lastIndex = 0;
     }
 
     // Phase 3: Risky Password Checks
@@ -463,9 +481,16 @@ function analyzeCodeForPlaintextPasswords(methodBody: string, methodName: string
     }];
 
     riskyPasswordChecks.forEach(({ pattern, handler }) => {
-        while ((match = pattern.exec(methodBody)) !== null) {
-            const msg = handler(match[1], match[2]);
-            if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
+        try {
+            while ((match = pattern.exec(methodBody)) !== null) {
+                const msg = handler(match[1], match[2]);
+                if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
+            }
+        } catch (error) {
+            console.error(`Error in risky password check: ${error}`);
+        } finally {
+            // Reset the lastIndex to avoid infinite loops
+            pattern.lastIndex = 0;
         }
     });
 
@@ -517,15 +542,22 @@ function checkRaceConditionVulnerabilities(methodBody: string, methodName: strin
     // Check for race condition in file access functions
     const config = vscode.workspace.getConfiguration('securityAnalysis');
     const raceCondtionKeywords = config.get<string[]>('raceConditionKeywords', ['fopen', 'freopen', 'fwrite', 'fread', 'fclose', 'fprintf', 'fputs', 'fscanf']);
+    let match;
 
     // Phase 1: Track File Access Functions
     const fileAccessPattern = new RegExp(`\\b(${raceCondtionKeywords.join('|')})\\s*\\(`, 'g'); 
-    let match;
-
-    while ((match = fileAccessPattern.exec(methodBody)) !== null) {
-        const fileAccess = match[1];
-        fileAccessFuctions.add(fileAccess);
-        issues.push('Warning: File access function detected in method "${methodName}". Ensure proper file locking to prevent race condtions.');
+    
+    try{
+        while ((match = fileAccessPattern.exec(methodBody)) !== null) {
+            const fileAccess = match[1];
+            fileAccessFuctions.add(fileAccess);
+            issues.push('Warning: File access function detected in method "${methodName}". Ensure proper file locking to prevent race condtions.');
+        }
+    } catch (error) {
+        console.error(`Error in file access function detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        fileAccessPattern.lastIndex = 0;
     }
 
     // Phase 2: Context-Aware Analysis
@@ -718,11 +750,19 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
 
     // Phase 1: Detect Insecure Random Functions
     const insecureRandomPattern = new RegExp(`\\b(${loopFunctions.join('|')})\\s*\\(`, 'g');
-    while ((match = insecureRandomPattern.exec(methodBody)) !== null) {
-        const func = match[1];
-        insecureRandomFunctions.add(func);
-        issues.push(`Warning: Insecure random number generator "${func}" detected in method "${methodName}". Use secure alternatives or libraries.`);
+    try {
+        while ((match = insecureRandomPattern.exec(methodBody)) !== null) {
+            const func = match[1];
+            insecureRandomFunctions.add(func);
+            issues.push(`Warning: Insecure random number generator "${func}" detected in method "${methodName}". Use secure alternatives or libraries.`);
+        }
+    } catch (error) {
+        console.error(`Error in insecure random function detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        insecureRandomPattern.lastIndex = 0;
     }
+    
 
     // Phase 2: Detect Insecure Seeding with time(NULL)
     const randomSeedPattern = /\bsrand\s*\(\s*time\s*\(\s*NULL\s*\)\s*\)/g;
@@ -733,10 +773,18 @@ function checkRandomNumberGeneration(methodBody: string, methodName: string): st
 
     //Phase 3: Detect Insecure RNG in Loops
     const loopPattern = new RegExp(`\\b(${loopFunctions.join('|')})\\s*\\(`, 'g');
-    while ((match = loopPattern.exec(methodBody)) !== null) {
-        insecureLoops.add(match[0]);
-        issues.push(`Warning: Insecure RNG "${match[0]}" detected in a loop in method "${methodName}". Ensure unbiased and secure random number generation.`);
+    try {
+        while ((match = loopPattern.exec(methodBody)) !== null) {
+            insecureLoops.add(match[0]);
+            issues.push(`Warning: Insecure RNG "${match[0]}" detected in a loop in method "${methodName}". Ensure unbiased and secure random number generation.`);
+        }
+    }  catch (error) {
+        console.error(`Error in insecure RNG detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        loopPattern.lastIndex = 0;
     }
+    
 
     // Phase 4: Context-Aware Analysis
     const contextAnalysis = [
@@ -819,21 +867,36 @@ function analyzeCodeForWeakHashingAndEncryption(methodBody: string, methodName: 
 
     // Detect weak hashing mechanisms
     const weakHashPattern = new RegExp(`\\b(${weakHashAlgorithms.join('|')})\\s*\\(`, 'gi');
-    while ((match = weakHashPattern.exec(methodBody)) !== null) {
-        const weakHash = match[1];
-        weakHashes.add(weakHash);
-        issues.push(`Warning: Weak hashing algorithm (${weakHash}) detected in method "${methodName}". Consider using a strong hash function like bcrypt, scrypt, or Argon2.`);
+    try{
+        while ((match = weakHashPattern.exec(methodBody)) !== null) {
+            const weakHash = match[1];
+            weakHashes.add(weakHash);
+            issues.push(`Warning: Weak hashing algorithm (${weakHash}) detected in method "${methodName}". Consider using a strong hash function like bcrypt, scrypt, or Argon2.`);
+        }
+    } catch (error) {
+        console.error(`Error in weak hash detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        weakHashPattern.lastIndex = 0;
     }
 
     // Detect encryption usage for passwords
     const encryptionPattern = new RegExp(`\\b(${weakEncryptionMethods.join('|')})\\s*\\(`, 'gi');
-    while ((match = encryptionPattern.exec(methodBody)) !== null) {
-        const encryptionMethod = match[1];
-        insecureEncryptionMethods.add(encryptionMethod);
-        issues.push(
-            `Warning: Passwords should not be encrypted using ${encryptionMethod} in method "${methodName}". Use a secure hashing algorithm (e.g., bcrypt, Argon2) instead.`
-        );
+    try {
+        while ((match = encryptionPattern.exec(methodBody)) !== null) {
+            const encryptionMethod = match[1];
+            insecureEncryptionMethods.add(encryptionMethod);
+            issues.push(
+                `Warning: Passwords should not be encrypted using ${encryptionMethod} in method "${methodName}". Use a secure hashing algorithm (e.g., bcrypt, Argon2) instead.`
+            );
+        }
+    } catch (error) {
+        console.error(`Error in encryption detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        encryptionPattern.lastIndex = 0;
     }
+    
 
     // Detect direct calls to insecure hash libraries in code
     const hashLibraryPattern = new RegExp(`\\b(${insecureHashLibrariesList.join('|')})\\b`, 'gi');
@@ -874,25 +937,41 @@ function checkInfiniteLoopsOrExcessiveResourceConsumption(methodBody: string, me
     
     // Check for loops without clear termination
     const infiniteLoopPattern = new RegExp(`\\b(${infiniteLoopPatterns.join('|')})\\s*{`, 'gi');
-    while ((match = infiniteLoopPattern.exec(methodBody)) !== null) {
-        const loop = match[0];
-        infiniteLoops.add(loop);
-        issues.push(
-            `Warning: Potential infinite loop detected in method "${methodName}" at position ${match.index}. Ensure proper termination conditions.`
-        );
+    try {
+        while ((match = infiniteLoopPattern.exec(methodBody)) !== null) {
+            const loop = match[0];
+            infiniteLoops.add(loop);
+            issues.push(
+                `Warning: Potential infinite loop detected in method "${methodName}" at position ${match.index}. Ensure proper termination conditions.`
+            );
+        }
+    } catch (error) {
+        console.error(`Error in infinite loop detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        infiniteLoopPattern.lastIndex = 0;
     }
+    
 
     // Detect excessive memory allocations
     const largeAllocationPattern = new RegExp(`\\b(malloc|calloc|realloc)\\s*\\(\\s*(\\d+)\\s*\\)`, 'gi');
-    while ((match = largeAllocationPattern.exec(methodBody)) !== null) {
-        const allocatedSize = parseInt(match[1] || match[2], 10);
-        if (allocatedSize > largeAllocationThreshold) { // Example threshold: 1 MB
-            largeAllocations.add('${match[1]}(${match[2]})');
-            issues.push(
-                `Warning: Excessive memory allocation (${allocatedSize} bytes) detected in method "${methodName}". Review memory usage.`
-            );
+    try {
+        while ((match = largeAllocationPattern.exec(methodBody)) !== null) {
+            const allocatedSize = parseInt(match[1] || match[2], 10);
+            if (allocatedSize > largeAllocationThreshold) { // Example threshold: 1 MB
+                largeAllocations.add('${match[1]}(${match[2]})');
+                issues.push(
+                    `Warning: Excessive memory allocation (${allocatedSize} bytes) detected in method "${methodName}". Review memory usage.`
+                );
+            }
         }
+    } catch (error) {
+        console.error(`Error in large allocation detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        largeAllocationPattern.lastIndex = 0;
     }
+    
 
     return issues;
 }
@@ -975,42 +1054,69 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
 
     // Phase 1: Path Traversal Pattern Detection
     const pathTraversalPattern = new RegExp(`\\b(${pathTraversalPatterns.join('|')})`, 'g');
-    while ((match = pathTraversalPattern.exec(methodBody)) !== null) {
-        const path = match[1];
-        riskyPaths.add(path);
-        issues.push(
-            `Warning: Potential Path Traversal vulnerability detected in method "${methodName}". Avoid using relative paths with user input.`
-        );
+    try {
+        while ((match = pathTraversalPattern.exec(methodBody)) !== null) {
+            const path = match[1];
+            riskyPaths.add(path);
+            issues.push(
+                `Warning: Potential Path Traversal vulnerability detected in method "${methodName}". Avoid using relative paths with user input.`
+            );
+        }
+    } catch (error) {
+        console.error(`Error in path traversal detection: ${error}`);
+    } finally {
+        // Reset the lastIndex to avoid infinite loops
+        pathTraversalPattern.lastIndex = 0;
     }
+    
     
     // Phase 2: Risky Function Detection
     riskyFunctions.forEach((func: string) => {
         const funcPattern = new RegExp(`\\b${func}\\b\\s*\\(([^)]+)\\)`, 'g');
-        while ((match = funcPattern.exec(methodBody)) !== null) {
-            const argument = match[1].trim();
-            riskyFunctionCalls.add(func);
-            issues.push(
-                `Warning: Path traversal vulnerability detected in function "${func}" in method "${methodName}" with argument "${argument}". Avoid using relative paths with user input.`
-            );
+        try {
+            while ((match = funcPattern.exec(methodBody)) !== null) {
+                const argument = match[1].trim();
+                riskyFunctionCalls.add(func);
+                if (!isSanitized(argument, methodBody)) {
+                    issues.push(
+                        `Warning: Path traversal vulnerability detected in function "${func}" in method "${methodName}" with argument "${argument}". Avoid using relative paths with user input.`
+                    );
+                }
+            }
+        } catch (error) {
+            console.error(`Error in risky function detection: ${error}`);
+        } finally {
+            // Reset the lastIndex to avoid infinite loops
+            funcPattern.lastIndex = 0;
         }
+        
     });
 
     // Phase 3: Unsanitized Input Detection
     const usagePattern = new RegExp(`\\b(${fileOperations.join('|')})\\s*\\(([^,]+),?`, 'g');
-    while ((match = usagePattern.exec(methodBody)) !== null) {
-        const input = match[2].trim();
-        unsanitizedInputs.add(input);
-        issues.push(
-            `Warning: Unsanitized input "${input}" detected in file operation in method "${methodName}". Ensure input is sanitized before use.`
-        );
+    try {
+        while ((match = usagePattern.exec(methodBody)) !== null) {
+            const input = match[2].trim();
+            unsanitizedInputs.add(input);
+            if (!isSanitized(input, methodBody)) {
+                issues.push(
+                    `Warning: Unsanitized input "${input}" detected in file operation in method "${methodName}". Ensure input is sanitized before use.`
+                );
+            }
+        }
+    } catch (error) {
+        console.error(`Error in unsanitized input detection: ${error}`);
+    } finally {
+        usagePattern.lastIndex = 0;
     }
+    
 
     // Phase 4: Context-Aware Analysis
     const contextChecks = [{
         pattern: /\b(exec|system|popen)\s*\(\s*([^)]+)\s*\)/g,
         handler: (fn: string, arg: string) => {
-            if (arg.includes('../') || arg.includes('"') || arg.includes('`')) {
-                return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Avoid using relative paths with user input.`;
+            if (!isSanitized(arg, methodBody) && (arg.includes('../') || arg.includes('"') || arg.includes('`'))) {
+                return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Ensure input is sanitized before use.`;
             }
             return null;
         }
@@ -1018,8 +1124,8 @@ function checkPathTraversalVulnerabilities(methodBody: string, methodName: strin
     {
         pattern: /\b(include|require)\s*\(\s*([^)]+)\s*\)/g,
         handler: (fn: string, arg: string) => {
-            if (arg.includes('../') || arg.includes('"') || arg.includes('`')) {
-                return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Avoid using relative paths with user input.`;
+            if (!isSanitized(arg, methodBody) && (arg.includes('../') || arg.includes('"') || arg.includes('`'))) {
+                return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Ensure input is sanitized before use.`;
             }
             return null;
         }
