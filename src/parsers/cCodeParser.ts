@@ -25,102 +25,107 @@ export class cCodeParser {
 
 
 
+// import fs from 'fs';
+// import Parser from 'tree-sitter';
+// import C from 'tree-sitter-c';
 
+// export class CCodeParser {
+//     private static parser: Parser;
 
+//     // Initialize Tree-sitter parser for C
+//     static initializeParser() {
+//         if (!this.parser) {
+//             this.parser = new Parser();
+//             this.parser.setLanguage(C as unknown as Parser.Language);
+//         }
+//     }
 
+//     /**
+//      * Extracts functions from C code using Tree-sitter.
+//      * @param code - The raw C code as a string.
+//      * @returns Array of objects containing function metadata.
+//      */
+//     static extractFunctions(code: string): {
+//         name: string;
+//         returnType: string;
+//         parameters: { type: string; name: string }[];
+//         lineNumber: number;
+//         functionCalls: string[];
+//     }[] {
+//         this.initializeParser();
+//         const tree = this.parser.parse(code);
+//         const functions: {
+//             name: string;
+//             returnType: string;
+//             parameters: { type: string; name: string }[];
+//             lineNumber: number;
+//             functionCalls: string[];
+//         }[] = [];
 
+//         function traverse(node: Parser.SyntaxNode) {
+//             if (node.type === 'function_definition') {
+//                 const typeNode = node.childForFieldName('type');
+//                 const declaratorNode = node.childForFieldName('declarator');
+//                 const bodyNode = node.childForFieldName('body');
 
+//                 if (typeNode && declaratorNode && bodyNode) {
+//                     const functionNameNode = declaratorNode.childForFieldName('declarator') || declaratorNode.child(0);
+//                     const parameterListNode = declaratorNode.childForFieldName('parameters');
 
-/*
-import { exec } from 'child_process';
+//                     const functionName = functionNameNode?.text || 'unknown';
+//                     const returnType = typeNode?.text || 'void';
 
+//                     // Extract parameter types
+//                     const parameters = parameterListNode
+//                         ? parameterListNode.children
+//                               .filter((param) => param.type === 'parameter_declaration')
+//                               .map((param) => {
+//                                   const type = param.childForFieldName('type')?.text || 'unknown';
+//                                   const name = param.childForFieldName('declarator')?.text || 'unnamed';
+//                                   return { type, name };
+//                               })
+//                         : [];
 
+//                     // Find function calls inside the function body
+//                     const functionCalls: string[] = [];
+//                     function findFunctionCalls(node: Parser.SyntaxNode) {
+//                         if (node.type === 'call_expression') {
+//                             const functionName = node.child(0)?.text || 'unknown';
+//                             functionCalls.push(functionName);
+//                         }
+//                         node.children.forEach(findFunctionCalls);
+//                     }
+//                     findFunctionCalls(bodyNode);
 
-export class cCodeParser {
-    /**
-     * Extracts methods/functions from the given C code using Clang AST.
-     * @param code The raw C code as a string.
-     * @returns A promise resolving to an array of method information objects.
-     
-    static async extractMethodsFromAST(code: string): Promise<MethodInfo[]> {
-        return new Promise((resolve, reject) => {
-            this.getClangAST(code, (ast) => {
-                if (!ast) {
-                    reject("Failed to parse Clang AST.");
-                    return;
-                }
+//                     // Get the line number where the function is declared
+//                     const lineNumber = node.startPosition.row + 1; // Tree-sitter uses 0-based indexing, so add 1
 
-                const methods: MethodInfo[] = [];
+//                     functions.push({
+//                         name: functionName,
+//                         returnType,
+//                         parameters,
+//                         lineNumber,
+//                         functionCalls,
+//                     });
+//                 }
+//             }
 
-                function traverse(node: any) {
-                    if (node.kind === 'FunctionDecl') {
-                        const bodyNode = node.children?.find((n: any) => n.kind === 'CompoundStmt');
-                        methods.push({
-                            name: node.name,
-                            parameters: node.children
-                                ?.filter((n: any) => n.kind === 'ParmVarDecl')
-                                .map((p: any) => p.name) || [],
-                            body: bodyNode ? cCodeParser.getSourceCodeSlice(code, bodyNode.range) : '',
-                            range: node.range,
-                            ast: node // Store full AST for deeper analysis
-                        });
-                    }
-                    node.children?.forEach(traverse);
-                }
+//             // Recursively traverse children
+//             node.children.forEach(traverse);
+//         }
 
-                traverse(ast);
-                resolve(methods);
-            });
-        });
-    }
+//         traverse(tree.rootNode);
+//         return functions;
+//     }
+// }
 
-    /**
-     * Runs Clang AST analysis on the given C code and returns the AST.
-     * @param code The raw C code as a string.
-     * @param callback A function to handle the parsed AST.
-     
-    static getClangAST(code: string, callback: (ast: any | null) => void): void {
-        exec(`echo "${code}" | clang -Xclang -ast-dump=json -fsyntax-only -xc -`, (err, stdout) => {
-            if (err) {
-                console.error("Clang AST analysis failed:", err);
-                callback(null);
-                return;
-            }
+// // ** Read from test.c file **
+// const filePath = 'test.c';
 
-            try {
-                const ast = JSON.parse(stdout);
-                callback(ast);
-            } catch (error) {
-                console.error("Failed to parse Clang AST JSON:", error);
-                callback(null);
-            }
-        });
-    }
-
-    /**
-     * Extracts a portion of the source code using AST-provided line ranges.
-     * @param code The full C source code.
-     * @param range The range object containing line numbers.
-     * @returns Extracted function body as a string.
-     
-    private static getSourceCodeSlice(code: string, range: { begin: any; end: any }) {
-        const lines = code.split('\n');
-        const startLine = range.begin.line - 1;
-        const endLine = range.end.line - 1;
-        return lines.slice(startLine, endLine + 1).join('\n');
-    }
-}
-
-/**
- * Represents information about an extracted C method.
- 
-export interface MethodInfo {
-    name: string;
-    parameters: string[];
-    body: string;
-    range: any;
-    ast: any;
-}
-
-
-*/
+// if (fs.existsSync(filePath)) {
+//     const code = fs.readFileSync(filePath, 'utf8');
+//     const parsedFunctions = CCodeParser.extractFunctions(code);
+//     console.log(JSON.stringify(parsedFunctions, null, 2));
+// } else {
+//     console.error(`Error: File '${filePath}' not found.`);
+// }
