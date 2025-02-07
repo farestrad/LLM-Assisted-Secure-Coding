@@ -20,7 +20,7 @@ export default [{
             format: ["camelCase", "PascalCase"],
         }],
 
-        curly: "warn",
+        curly: "off",
         eqeqeq: "warn",
         "no-throw-literal": "warn",
         semi: "warn",
