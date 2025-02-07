@@ -71,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            outputChannel.appendLine('Generating code with DeepSeek r1...');//adding this here since deepseek is the same as codellama or llama3 so not much different doesnt hurt to have the look of we are using deepseek tho!
+            outputChannel.appendLine('Generating code with AI...');//adding this here since deepseek is the same as codellama or llama3 so not much different doesnt hurt to have the look of we are using deepseek tho!
 
             try {
                 const response = await fetch('http://172.105.25.95:11434/api/generate', {

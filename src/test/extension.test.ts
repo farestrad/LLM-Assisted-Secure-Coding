@@ -1,15 +1,26 @@
-import * as assert from 'assert';
+import { IntegerFlowCheck } from '../testers/c/checkIntegerOverflowUnderflow'; // Adjust the path accordingly
+describe('IntegerFlowCheck', () => {
+    let checker: any;
 
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
-import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+    beforeEach(() => {
+        checker = new IntegerFlowCheck();
+    });
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+    test('should detect integer overflow', () => {
+        const methodBody = 'x = 9007199254740991 + 1;'; // MAX_SAFE_INTEGER + 1
+        const result = checker.check(methodBody, 'testMethod');
+        expect(result.length).toBeGreaterThan(0);
+    });
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
-	});
+    test('should detect integer underflow', () => {
+        const methodBody = 'y = -9007199254740991 - 2;'; // MIN_SAFE_INTEGER - 1
+        const result = checker.check(methodBody, 'testMethod');
+        expect(result.length).toBeGreaterThan(0);
+    });
+
+    test('should not flag safe operations', () => {
+        const methodBody = 'z = 100 + 50;';
+        const result = checker.check(methodBody, 'testMethod');
+        expect(result.length).toBe(0);
+    });
 });

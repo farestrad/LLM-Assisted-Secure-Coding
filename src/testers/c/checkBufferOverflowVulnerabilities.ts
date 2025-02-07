@@ -13,7 +13,7 @@ export class BufferOverflowCheck implements SecurityCheck{
         const variables = new Map<string, number>(); //tracks buffer size 
         const validationChecks = new Set<string>(); // track wether ot not buffer was validated before being used
         const calledFunctions = new Set<string>(); // track function calls
-        const validationFunctions = new Set<string>();
+        const validationFunctions = new Set<string>(); 
 
     // Get configuration from VSCode
     const config = vscode.workspace.getConfiguration('securityAnalysis');
@@ -34,18 +34,21 @@ export class BufferOverflowCheck implements SecurityCheck{
     }
 
     // Phase 3: Inter-procedural Validation Tracking
+    //identify function that return bool or int (i.e a validating function) ex bool isValid ( const char * input)...
     const valFuncRegex = /(?:bool|int)\s+(\w+)\s*\(.*\b(const char\s*\*|void\s*\*).*\)/g;
     while ((match = valFuncRegex.exec(methodBody)) !== null) {
         validationFunctions.add(match[1]);
     }
 
     // Phase 4: Function Call Tracking
+    // detect recursion or unsafe function call
     const callRegex = /\b(\w+)\s*\(/g;
     while ((match = callRegex.exec(methodBody)) !== null) {
         calledFunctions.add(match[1]);
     }
 
     // Phase 5: Context-Aware Risky Function Analysis
+    // use the before function to identify whats safe
     const functionChecks = [
         {
             pattern: /\b(strcpy|gets|sprintf)\s*\(\s*(\w+)\s*,/g,
@@ -86,7 +89,12 @@ export class BufferOverflowCheck implements SecurityCheck{
         }
     });
 
-    // Phase 6: Recursive Function Analysis
+    // Phase 6: Recursive Function that uses buffer Analysis 
+    /*
+    How it works:
+    Checks if the function calls itself.
+    If true, lists all local buffers and warns about recursion risks.
+    */
     if (calledFunctions.has(methodName)) {
         const localBuffers = Array.from(variables.keys()).join(', ');
         if (localBuffers) {
@@ -95,6 +103,10 @@ export class BufferOverflowCheck implements SecurityCheck{
     }
 
     // Phase 7: Stack Allocation Analysis
+    /*
+    Why?
+    Allocating large buffers on the stack can cause stack overflow vulnerabilities.
+    */
     const largeBufferPattern = /\b(char|int|long)\s+(\w+)\s*\[\s*(\d+)\s*\]/g;
     while ((match = largeBufferPattern.exec(methodBody)) !== null) {
         const bufferSize = parseInt(match[3], 10);
