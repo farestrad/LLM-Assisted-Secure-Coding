@@ -13,7 +13,7 @@ export class WeakHashingEncryptionCheck implements SecurityCheck {
     let match;
 
     // Detect weak hashing mechanisms
-    const weakHashPattern = /\b(md5|sha1|crypt)\s*\(/gi;
+    const weakHashPattern = /\b(MD5|SHA1|crypt|md5|sha1)_?\w*\s*\(/gi;
     while ((match = weakHashPattern.exec(methodBody)) !== null) {
         const weakHash = match[1];
         weakHashes.add(weakHash);

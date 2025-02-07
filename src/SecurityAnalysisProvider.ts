@@ -135,7 +135,7 @@ const TOP_CWES = [
 export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
-
+    
     private securityIssues: vscode.TreeItem[] = [];
     private matchedCWEs: vscode.TreeItem[] = [];
 
@@ -249,4 +249,9 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
 
         return [];
     }
+
+    updateCveDetails(cveId: string) {
+        // Do nothing for now
+    }
+    
 }

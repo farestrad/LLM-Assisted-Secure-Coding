@@ -22,7 +22,13 @@ export class PathTraversalCheck implements SecurityCheck{
     const fileOperations = config.get<string[]>('fileOperations', ['open', 'read', 'write', 'fread', 'fwrite', 'unlink', 'rename']);
 
     // Phase 1: Path Traversal Pattern Detection
-    const pathTraversalPattern = new RegExp(`\\b(${pathTraversalPatterns.join('|')})`, 'g');
+    function escapeRegex(str: string): string {
+        return str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    }
+    
+    const escapedPatterns = pathTraversalPatterns.map(escapeRegex);
+    const pathTraversalPattern = new RegExp(`\\b(${escapedPatterns.join('|')})`, 'g');
+    
     while ((match = pathTraversalPattern.exec(methodBody)) !== null) {
         const path = match[1];
         riskyPaths.add(path);

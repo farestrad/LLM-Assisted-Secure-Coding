@@ -10,9 +10,9 @@ import { SecurityCheck } from "../c/SecurityCheck";
 export class BufferOverflowCheck implements SecurityCheck{
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
-        const variables = new Map<string, number>();
-        const validationChecks = new Set<string>();
-        const calledFunctions = new Set<string>();
+        const variables = new Map<string, number>(); //tracks buffer size 
+        const validationChecks = new Set<string>(); // track wether ot not buffer was validated before being used
+        const calledFunctions = new Set<string>(); // track function calls
         const validationFunctions = new Set<string>();
 
     // Get configuration from VSCode
@@ -27,6 +27,7 @@ export class BufferOverflowCheck implements SecurityCheck{
     }
 
     // Phase 2: Advanced Validation Check Detection
+    //if (strlen(buffer) < sizeof(buffer) ...)
     const validationRegex = /(?:\b(?:if|while|for)\s*\(|&&|\|\|).*\b(?:strlen|sizeof|_countof)\s*\(\s*(\w+)\s*\).*?(?:\)|;)/g;
     while ((match = validationRegex.exec(methodBody)) !== null) {
         validationChecks.add(match[1]);
