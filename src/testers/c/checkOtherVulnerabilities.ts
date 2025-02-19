@@ -46,7 +46,7 @@ export class OtherVulnerabilitiesCheck implements SecurityCheck {
         }
 
         // Check for improper authentication handling
-        const authPattern = /\b(==|!=)\s*["'].*["']/g;
+        const authPattern = /(==|!=)\s*["'].*["']/g; // removing \b
         authPattern.lastIndex = 0;
         while ((match = authPattern.exec(methodBody)) !== null) {
             if (!match[0]) break;

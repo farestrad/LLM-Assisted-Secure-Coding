@@ -16,7 +16,7 @@ export class HeapOverflowCheck implements SecurityCheck {
         const validationChecks = new Set<string>();
         const arithmeticOperations = new Set<string>();
         const freedVariables = new Set<string>();
-        let lineNumber = 1
+        let lineNumber = 1;
 
     // Phase 1: Track Heap Allocations and Reallocations
     const allocationRegex = /(\w+)\s*=\s*(malloc|calloc|realloc)\s*\(([^)]+)\)/g;
