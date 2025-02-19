@@ -234,8 +234,4 @@ vscode.window.showInformationMessage(formattedDetails, { modal: true });
 });
 
 
-
-
-
-
 export function deactivate() {}

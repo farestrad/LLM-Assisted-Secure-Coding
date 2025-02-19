@@ -65,7 +65,7 @@ export class BufferOverflowCheck implements SecurityCheck{
                 if (!validationChecks.has(sizeVar)) {
                     return `Untrusted allocation size "${sizeVar}"`;
                 }
-                return null;
+                //return null; put back
             }
         },
         {
@@ -148,15 +148,16 @@ export class BufferOverflowCheck implements SecurityCheck{
     // Helper Functions
     function parseSizeExpression(expr: string): number | null {
         // Handle sizeof() expressions
-        const sizeofMatch = expr.match(/sizeof\s*\(\s*(\w+)\s*\)/);
-        if (sizeofMatch) return variables.get(sizeofMatch[1]) || null;
+        const sizeofMatch = expr.match(/sizeof\s*\(\s*(.+?)\s*\)/);
+
+        //if (sizeofMatch) return variables.get(sizeofMatch[1]) || null; put back
 
         // Handle arithmetic expressions
         if (expr.includes('+') || expr.includes('*')) {
             try {
                 return eval(expr.replace(/\b(\w+)\b/g, (_, v) => variables.get(v)?.toString() || '0'));
             } catch {
-                return null;
+               // return null; put back
             }
         }
 
