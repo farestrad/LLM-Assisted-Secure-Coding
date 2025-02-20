@@ -24,7 +24,7 @@ export class PathTraversalCheck implements SecurityCheck {
         }
 
         const escapedPatterns = pathTraversalPatterns.map(escapeRegex);
-       // const pathTraversalPattern = new RegExp(`\\b(${escapedPatterns.join('|')})`, 'g'); put back this is never reached
+        const pathTraversalRegPattern = new RegExp(`\\b(${escapedPatterns.join('|')})`, 'g'); // put back this is never reached
         const pathTraversalPattern = /(\.\.\/|~\/|\/\.\.|\\\.\.\\)/g;
 
 

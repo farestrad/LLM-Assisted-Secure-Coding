@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { SecurityCheck } from "../c/SecurityCheck";
 
 /**
- * Check for race condition vulnerabilities in a method. (Minhyeok)
+ * Check for race condition vulnerabilities in a method. 
  */
 export class RaceConditionCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {

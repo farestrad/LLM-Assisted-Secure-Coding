@@ -8,7 +8,7 @@ import { SecurityCheck } from "../c/SecurityCheck";
 //import { parseCCode } from '../parsers/cParser';
 
 /**
- * Check for infinite loops or excessive resource consumption in a method. (Minhyeok)
+ * Check for infinite loops or excessive resource consumption in a method. 
  */
 export class InfiniteLoopCheck implements SecurityCheck{
     check(methodBody: string, methodName: string): string[] {

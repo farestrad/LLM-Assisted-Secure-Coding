@@ -9,7 +9,7 @@ import { SecurityCheck } from "../c/SecurityCheck";
 
 
 /**
- * Check for integer overflow and underflow vulnerabilities in a method. (Minhyeok)
+ * Check for integer overflow and underflow vulnerabilities in a method. 
  */
 export class IntegerFlowCheck implements SecurityCheck{
     check (methodBody: string, methodName: string): string[] {

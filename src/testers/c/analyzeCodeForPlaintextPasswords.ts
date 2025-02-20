@@ -9,7 +9,7 @@ import { SecurityCheck } from "../c/SecurityCheck";
 
 
 /**
- * Analyze a method for potential plaintext password vulnerabilities. (Minhyeok)
+ * Analyze a method for potential plaintext password vulnerabilities. 
  */
 export class PlaintextPasswordCheck implements SecurityCheck{
     check(methodBody: string, methodName: string): string[] {
