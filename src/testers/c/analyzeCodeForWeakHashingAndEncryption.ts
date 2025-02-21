@@ -48,9 +48,9 @@ export class WeakHashingEncryptionCheck implements SecurityCheck {
     const hashLibraryPattern = /\b#include\s*[<"]?\s*openssl\/(md5|sha)\.h\s*[>"]?/gi;
     
     if (hashLibraryPattern.test(methodBody)) {
-        //issues.push(
+        // issues.push(
         //    `Warning: Insecure hash library inclusion detected in method "${methodName}". Avoid using MD5 or SHA-1 from OpenSSL or similar libraries for password hashing.`
-        //); put nack
+        // ); // put nack
     }
 
     return issues;
