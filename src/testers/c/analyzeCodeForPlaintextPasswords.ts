@@ -70,22 +70,20 @@ export class PlaintextPasswordCheck implements SecurityCheck{
     function isPasswordVariable(variable: string): boolean {
         return Array.from(passwordVariables).some((passwordVar) => new RegExp(`\\b${passwordVar}\\b`).test(variable));
     }
-    // // Look for password-related variables
-    // const passwordPattern = /\b(pass|password|passwd|pwd|user_password|admin_password|auth_pass|login_password|secure_password|db_password|secret_key|passphrase|master_password)\b\s*=\s*["']?.+["']?/gi;
-    // while ((match = passwordPattern.exec(methodBody)) !== null) {
-    //     const passwordVar = match[0];
-    //     issues.push(
-    //         `Warning: Potential password variable (${passwordVar}) detected in method "${methodName}". Ensure it is not stored in plaintext.`
-    //     );
-    // }
+    // Look for password-related variables
+    while ((match = passwordPattern.exec(methodBody)) !== null) {
+        const passwordVar = match[0];
+        issues.push(
+            `Warning: Potential password variable (${passwordVar}) detected in method "${methodName}". Ensure it is not stored in plaintext.`
+        );
+    }
 
-    // // Look for file write operations involving password variables
-    // const fileWritePattern = /\b(fwrite|fprintf|write|ofstream|fputs)\s*\(\s*[^,]+/g;
-    // while ((match = fileWritePattern.exec(methodBody)) !== null) {
-    //     issues.push(
-    //         `Warning: File write operation detected in method "${methodName}". Ensure sensitive data is encrypted before storage.`
-    //     );
-    // }
+    // Look for file write operations involving password variables
+    while ((match = fileWritePattern.exec(methodBody)) !== null) {
+        issues.push(
+            `Warning: File write operation detected in method "${methodName}". Ensure sensitive data is encrypted before storage.`
+        );
+    }
 
     return issues;
 }
