@@ -4,6 +4,8 @@ import { GeneratedCodeProvider } from './generatedCodeProvider';
 import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
 import { AISuggestionHistoryProvider, AISuggestion } from './AISuggestionHistoryProvider';  
 import { VulnerabilityDatabaseProvider } from './VulnerabilityDatabaseProvider';
+import { trackEvent } from './amplitudeTracker';
+
 
 // Activate function
 export function activate(context: vscode.ExtensionContext) {
@@ -70,6 +72,13 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage('Please select the line you want to check.');
                 return;
             }
+            
+            
+            trackEvent('code_generation_initiated', {
+                user_id: vscode.env.machineId,
+                selected_text_length: selectedText.length,
+                timestamp: new Date().toISOString()
+            });
 
             outputChannel.appendLine('Generating code with AI...');//adding this here since deepseek is the same as codellama or llama3 so not much different doesnt hurt to have the look of we are using deepseek tho!
 
@@ -145,6 +154,13 @@ export function activate(context: vscode.ExtensionContext) {
         if (id >= 0) {
             aiSuggestionHistoryProvider.updateAISuggestionStatus(id, 'accepted');
             vscode.window.showInformationMessage('AI suggestion accepted.');
+            
+            trackEvent('ai_suggestion_accepted', {
+                user_id: vscode.env.machineId,
+                suggestion_length: element.suggestion.length,
+                timestamp: new Date().toISOString()
+            });
+        
         } else {
             vscode.window.showErrorMessage('AI suggestion not found.');
         }
@@ -156,6 +172,14 @@ export function activate(context: vscode.ExtensionContext) {
         if (id >= 0) {
             aiSuggestionHistoryProvider.updateAISuggestionStatus(id, 'rejected');
             vscode.window.showInformationMessage('AI suggestion rejected.');
+        
+            trackEvent('ai_suggestion_rejected', {
+                user_id: vscode.env.machineId,
+                suggestion_length: element.suggestion.length,
+                timestamp: new Date().toISOString()
+            });
+        
+        
         } else {
             vscode.window.showErrorMessage('AI suggestion not found.');
         }
