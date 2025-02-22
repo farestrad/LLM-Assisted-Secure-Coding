@@ -2,6 +2,7 @@
 - run ```npm install```
 - ```npm install node-fetch@^2```
 - ```npm run compile```
+- ```npm install --save-dev @types/amplitude-js```
 
 ## Updates and fetches latest commit
 - ```git fetch origin```
