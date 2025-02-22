@@ -55,7 +55,7 @@ export class RandomNumberGenerationCheck implements SecurityCheck {
             if (!secureRandomFunctions.includes(fn)) {
                 return `Insecure seed source "${args}" for ${fn}`;
             }
-            return null;
+            return null; // Explicitly return null to indicate no issues
         }
     },
     {

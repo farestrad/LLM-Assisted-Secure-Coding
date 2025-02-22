@@ -53,8 +53,8 @@ export class PathTraversalCheck implements SecurityCheck {
         // 🔹 Phase 3: Unsanitized Input Detection
         const usagePattern = new RegExp(`\\b(${fileOperations.join('|')})\\s*\\(([^,]+),?`, 'g');
         while ((match = usagePattern.exec(methodBody)) !== null) {
-            const input = match[2].trim();
-            if (!isSanitized(input, methodBody)) { 
+            const input = match[2]?.trim();
+            if (input && !isSanitized(input, methodBody)) { 
                 unsanitizedInputs.add(input);
                 issues.push(
                     `Warning: Unsanitized input "${input}" detected in file operation in method "${methodName}". Ensure input is sanitized before use.`
@@ -63,22 +63,23 @@ export class PathTraversalCheck implements SecurityCheck {
         }
 
         // 🔹 Phase 4: Context-Aware Execution & File Inclusion Analysis
-        const contextChecks = [{
-            pattern: /\b(exec|system|popen)\s*\(\s*([^)]+)\s*\)/g,
-            handler: (fn: string, arg: string) => {
-                if (!isSanitized(arg, methodBody) && (arg.includes('../') || arg.includes('"') || arg.includes('`'))) {
-                    return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Avoid using relative paths with user input.`;
+        const contextChecks = [
+            {
+                pattern: /\b(exec|system|popen)\s*\(\s*([^)]+)\s*\)/g,
+                handler: (fn: string, arg: string) => {
+                    if (!isSanitized(arg, methodBody) && (arg.includes('../') || arg.includes('"') || arg.includes('`'))) {
+                        return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Avoid using relative paths with user input.`;
+                    }
+                    return null; // Explicitly return null if no issue is found
                 }
-               // return null; put back
-            }
-        },
+            },
         {
             pattern: /\b(include|require)\s*\(\s*([^)]+)\s*\)/g,
             handler: (fn: string, arg: string) => {
                 if (!isSanitized(arg, methodBody) && (arg.includes('../') || arg.includes('"') || arg.includes('`'))) {
                     return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Avoid using relative paths with user input.`;
                 }
-                return null;
+                return null; // Explicitly return null if no issue is found
             }
         }];
 
@@ -101,7 +102,9 @@ export class PathTraversalCheck implements SecurityCheck {
                 /htmlentities\s*\(/,
                 /preg_replace\s*\(/
             ];
-            return sanitizationPatterns.some(pattern => pattern.test(methodBody));
+            const sanitized  = sanitizationPatterns.some(pattern => pattern.test(methodBody));
+            console.log(`Checking if "${input}" is sanitized: ${sanitized}`);
+            return sanitized;
         }
 
         return issues;
