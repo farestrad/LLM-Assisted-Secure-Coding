@@ -83,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
             outputChannel.appendLine('Generating code with AI...');//adding this here since deepseek is the same as codellama or llama3 so not much different doesnt hurt to have the look of we are using deepseek tho!
 
             try {
-                const response = await fetch('http://172.105.25.95:11434/api/generate', {
+                const response = await fetch('http://172.105.18.68:11434/api/generate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -154,13 +154,29 @@ export function activate(context: vscode.ExtensionContext) {
         if (id >= 0) {
             aiSuggestionHistoryProvider.updateAISuggestionStatus(id, 'accepted');
             vscode.window.showInformationMessage('AI suggestion accepted.');
-            
+
             trackEvent('ai_suggestion_accepted', {
                 user_id: vscode.env.machineId,
                 suggestion_length: element.suggestion.length,
                 timestamp: new Date().toISOString()
             });
         
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage("No active editor found.");
+                return;
+            }
+
+             const selection = editor.selection;
+
+            editor.edit(editBuilder => {
+                editBuilder.replace(selection, element.suggestion);
+            }).then(success => {
+                if (!success) {
+                    vscode.window.showInformationMessage('suggestion not changed');
+                }
+            });
+
         } else {
             vscode.window.showErrorMessage('AI suggestion not found.');
         }
@@ -183,6 +199,26 @@ export function activate(context: vscode.ExtensionContext) {
         } else {
             vscode.window.showErrorMessage('AI suggestion not found.');
         }
+    });
+
+    vscode.commands.registerCommand('extension.acceptGeneratedCode', async () => {
+        
+        const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage("No active editor found.");
+                return;
+            }
+
+             const selection = editor.selection;
+
+            editor.edit(editBuilder => {
+                editBuilder.replace(selection, generatedCodeProvider.getLatestGeneratedCode());
+            }).then(success => {
+                if (!success) {
+                    vscode.window.showInformationMessage('code not accepted');
+                }
+            });
+        
     });
 
     vscode.commands.registerCommand('extension.toggleSuggestionStatus', (element: AISuggestion) => {
