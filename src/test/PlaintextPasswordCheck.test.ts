@@ -55,4 +55,35 @@ describe('PlaintextPasswordCheck Unit Tests', () => {
         
         expect(issues).toEqual([]);
     });
+
+    test('Detects risky plaintext password usage in function calls', () => {
+        const methodBody = `
+            char *password = "mysecret";
+            // This should trigger the "passed" check since the first argument is 'password'
+            printf(password, "format string");
+            // This should trigger the "logged" check
+            console.log(password);
+        `;
+        const methodName = "testFunction";
+        const issues = checker.check(methodBody, methodName);
+        
+        expect(issues).toEqual(expect.arrayContaining([
+             expect.stringContaining('Potential plaintext password passed to printf'),
+             expect.stringContaining('Potential plaintext password logged by console.log')
+        ]));
+    });
+    
+    test('Risky checks return null for non-password variable usage', () => {
+        const methodBody = `
+            int notAPassword = 1234;
+            // Although these functions match the risky call regex, "notAPassword" is not detected as a password variable.
+            printf(notAPassword, "format string");
+            console.log(notAPassword);
+        `;
+        const methodName = "testFunction";
+        const issues = checker.check(methodBody, methodName);
+        // Expect no warnings from risky checks since notAPassword isn't in the password variable set.
+        expect(issues).toEqual([]);
+    });
+    
 });
