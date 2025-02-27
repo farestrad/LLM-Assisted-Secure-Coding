@@ -27,7 +27,7 @@
 - it should look something like this ```ubuntu-s-4vcpu-8gb-240gb-intel-tor1-01``` click it.
 - now click access and click launch droplet console
 
-## Setup Ollama on the server (just copy paste these commands
+## Setup Ollama on the server (just copy paste these commands)
 - ```curl -fsSL https://ollama.com/install.sh | sh```
 - ```ollama run llama3```
 if you try tunninmg ollama run llama3 and it gives you an error after success log in console then run the below command to fill space

@@ -173,6 +173,7 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
+    "@types/amplitude-js": "^8.16.5",
     "@types/jest": "^29.5.14",
     "@types/node": "20.x",
     "@types/node-fetch": "^2.6.11",
@@ -190,7 +191,6 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@types/amplitude-js": "^8.16.5",
     "amplitude-js": "^8.21.9",
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
