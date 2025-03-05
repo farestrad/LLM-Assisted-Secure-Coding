@@ -26,7 +26,7 @@
 - now your droplet should be on and you can now access your console
 - it should look something like this ```ubuntu-s-4vcpu-8gb-240gb-intel-tor1-01``` click it.
 - now click access and click launch droplet console
-
+- using gcp set 2vCPU + 8GB RAM 30GB persistent balanced disk (i think this is best and cost efficient.)
 ## Setup Ollama on the server (just copy paste these commands)
 - ```curl -fsSL https://ollama.com/install.sh | sh```
 - ```ollama run llama3```
