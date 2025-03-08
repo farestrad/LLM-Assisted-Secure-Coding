@@ -74,6 +74,10 @@
       {
         "command": "extension.fetchCveDetails",
         "title": "Fetch CVE Details"
+      },
+      {
+        "command": "extension.acceptGeneratedCode",
+        "title": "Accept Code"
       }
     ],
     "keybindings": [
@@ -102,7 +106,7 @@
       "view/item/context": [
         {
           "command": "extension.acceptAISuggestion",
-          "when": "view == aiSuggestionHistoryView && aiSuggestion == 'pending'",
+          "when": "view == aiSuggestionHistoryView",
           "group": "inline"
         },
         {
@@ -113,6 +117,11 @@
         {
           "command": "extension.fetchCveDetails",
           "when": "view == securityAnalysisView",
+          "group": "inline"
+        },
+        {
+          "command": "extension.acceptGeneratedCode",
+          "when": "view == codeLlamaGeneratedCodeView",
           "group": "inline"
         }
       ]
