@@ -1,11 +1,12 @@
 import { runCTests } from './cTester';
 import { runJavaTests } from './javaTester';
+import { CCodeParser } from '../parsers/cCodeParser';
 
-// Main testing function
 export async function runTestsOnGeneratedCode(code: string, language: string, securityAnalysisProvider: any) {
     switch (language) {
         case 'c':
-            await runCTests(code, securityAnalysisProvider);
+            const extractedFunctions = CCodeParser.extractFunctions(code); // ✅ Extract functions first
+            await runCTests(extractedFunctions, securityAnalysisProvider); // ✅ Pass structured function objects
             break;
         case 'java':
             await runJavaTests(code, securityAnalysisProvider);
@@ -14,3 +15,4 @@ export async function runTestsOnGeneratedCode(code: string, language: string, se
             throw new Error(`Language ${language} not supported.`);
     }
 }
+

@@ -1,6 +1,6 @@
 import amplitude from 'amplitude-js';
 
-const AMPLITUDE_API_KEY = '70952581a5fe3101de0eaadf90af23ab';
+const AMPLITUDE_API_KEY = '70952581a5fe3101de0eaadf90af23ab'; //.Env hidden files??
 const amplitudeInstance = amplitude.getInstance();
 amplitudeInstance.init(AMPLITUDE_API_KEY);
 

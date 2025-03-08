@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { runCTests } from './testers/cTester';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
-
+import { CCodeParser } from "./parsers/cCodeParser";
 const TOP_CWES = [
         {
             id: 79,
@@ -206,10 +206,19 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
     // Method to run security analysis on the latest generated code
     async analyzeLatestGeneratedCode(): Promise<void> {
         const code = this.generatedCodeProvider.getLatestGeneratedCode();
-
+    
         if (code) {
             this.clear(); // Clear previous analysis results
-            runCTests(code, this); // Run the C tests and update security issues
+    
+            // NEW STEP: Extract functions before running tests
+            const extractedFunctions = CCodeParser.extractFunctions(code);
+    
+            if (extractedFunctions.length === 0) {
+                vscode.window.showWarningMessage("No functions detected in the code.");
+                return;
+            }
+    
+            runCTests(extractedFunctions, this); // Pass structured function data
         } else {
             vscode.window.showWarningMessage("No code generated to analyze.");
         }

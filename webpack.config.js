@@ -20,11 +20,14 @@ const extensionConfig = {
     libraryTarget: 'commonjs2'
   },
   externals: {
-    vscode: 'commonjs vscode' // the vscode-module is created on-the-fly and must be excluded. Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
-    // modules added here also need to be added in the .vscodeignore file
+    vscode: 'commonjs vscode', // Exclude VS Code module
+    'tree-sitter': 'commonjs tree-sitter', // 👈 Exclude tree-sitter
+    'tree-sitter-c': 'commonjs tree-sitter-c' // 👈 Exclude tree-sitter-c
+    // Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
+    // Modules added here also need to be added in the .vscodeignore file
   },
   resolve: {
-    // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
+    // Support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
     extensions: ['.ts', '.js']
   },
   module: {
@@ -42,7 +45,8 @@ const extensionConfig = {
   },
   devtool: 'nosources-source-map',
   infrastructureLogging: {
-    level: "log", // enables logging required for problem matchers
+    level: "log", // Enables logging required for problem matchers
   },
 };
-module.exports = [ extensionConfig ];
+
+module.exports = [extensionConfig];
