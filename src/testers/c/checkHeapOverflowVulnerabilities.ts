@@ -64,12 +64,12 @@ export class HeapOverflowCheck implements SecurityCheck {
                 if (!isSizeValidated(newSize, validationChecks)) {
                     return `Unvalidated realloc of "${ptr}" with size "${newSize}"`;
                 }
-                return null;
+                return null; // Explicitly return null to indicate no issues
             }
         },
         {
-            pattern: /(\w+)\s*=\s*\w+\s*\+\s*\d+/g,
-            handler: (varName: string) => {
+            pattern: /(\w+)\s*=\s*(\w+)\s*\+\s*(\d+)/g,
+            handler: (varName: string, rhsVar: string, constant: string) => {
                 if (heapAllocations.has(varName) && !validationChecks.has(varName)) {
                     return `Unsafe pointer arithmetic on heap variable "${varName}"`;
                 }

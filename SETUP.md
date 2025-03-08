@@ -26,9 +26,10 @@
 - now your droplet should be on and you can now access your console
 - it should look something like this ```ubuntu-s-4vcpu-8gb-240gb-intel-tor1-01``` click it.
 - now click access and click launch droplet console
-
-## Setup Ollama on the server (just copy paste these commands
+- using gcp set 2vCPU + 8GB RAM 30GB persistent balanced disk (i think this is best and cost efficient.)
+## Setup Ollama on the server (just copy paste these commands)
 - ```curl -fsSL https://ollama.com/install.sh | sh```
+- ```service ollama start```
 - ```ollama run llama3```
 if you try tunninmg ollama run llama3 and it gives you an error after success log in console then run the below command to fill space
 ```sudo fallocate -l 2G /swapfile
@@ -42,9 +43,18 @@ You would need to ensure you copy the ipv4 address from your digital ocean dashb
 - ```mkdir -p /etc/systemd/system/ollama.service.d```
 - ```echo [Service] >>/etc/systemd/system/ollama.service.d/environment.conf```
 - ```echo Environment=OLLAMA_HOST=0.0.0.0:11434 >>/etc/systemd/system/ollama.service.d/environment.conf```
-- 
+  run sudo nano /etc/systemd/system/ollama.service
+```echo -e "[Service]\nEnvironment=\"OLLAMA_HOST=0.0.0.0:11434\"" | sudo tee /etc/systemd/system/ollama.service.d/environment.conf```
+and change the service to 
+```
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+ExecStart=/usr/local/bin/ollama serve
+```
+
 - ```sudo systemctl daemon-reload```
 - ```sudo systemctl restart ollama```
+- ```ss -tulnp | grep 11434```
 everything should be working.
 
 ## Test
