@@ -83,7 +83,7 @@ export function activate(context: vscode.ExtensionContext) {
             outputChannel.appendLine('Generating code with AI...');//adding this here since deepseek is the same as codellama or llama3 so not much different doesnt hurt to have the look of we are using deepseek tho!
 
             try {
-                const response = await fetch('http://172.105.18.68:11434/api/generate', {
+                const response = await fetch('http://34.72.188.73:11434/api/generate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
