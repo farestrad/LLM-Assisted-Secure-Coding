@@ -4,6 +4,7 @@ import { promisify } from 'util';
 import { cCodeParser } from '../parsers/cCodeParser';
 import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 import { SecurityCheck } from "./c/SecurityCheck";
+import { TOP_CWES } from '../SecurityAnalysisProvider';
 
 // Dynamically import all security checks
 import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
@@ -38,6 +39,27 @@ const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
 // const tempFilePath = vscode.workspace.workspaceFolders
 //     ? `${vscode.workspace.workspaceFolders[0].uri.fsPath}/temp_test_code.c`
 //     : `/tmp/temp_test_code.c`;
+
+// Create a mapping of security checks to their corresponding CWEs
+const securityCheckToCWE: { [key: string]: number } = {
+    'BufferOverflowCheck': 125,
+    'HeapOverflowCheck': 125,
+    'PlaintextPasswordCheck': 20,
+    'RaceConditionCheck': 20,
+    'OtherVulnerabilitiesCheck': 20,
+    'RandomNumberGenerationCheck': 20,
+    'WeakHashingEncryptionCheck': 20,
+    'InfiniteLoopCheck': 400,
+    'IntegerFlowCheck': 190,
+    'PathTraversalCheck': 22,
+};
+
+// Define the type for CWE
+type CWE = {
+    id: number;
+    name: string;
+    description: string;
+};
 
 /**
  * Main function to analyze C code for vulnerabilities.
@@ -84,7 +106,19 @@ function analyzeMethodForSecurityIssues(method: { name: string; parameters: stri
 
     // Loop through all security checks dynamically
     securityChecks.forEach(check => {
-        issues.push(...check.check(method.body, method.name));
+        const checkName = check.constructor.name; // Get the name of the check class
+        const cweId = securityCheckToCWE[checkName]; // Get the corresponding CWE ID
+
+        // Check for vulnerabilities and add the CWE if applicable
+        const foundIssues = check.check(method.body, method.name);
+        if (foundIssues.length > 0 && cweId) {
+            foundIssues.forEach(issue => {
+                const cwe: CWE | undefined = TOP_CWES.find(cwe => cwe.id === cweId); // Specify the type for cwe
+                issues.push(`${issue} (CWE-${cweId}: ${cwe?.name})`); // Append CWE ID and name to the issue
+            });
+        } else {
+            issues.push(...foundIssues);
+        }
     });
 
     return issues;

@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { runCTests } from './testers/cTester';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
 
-const TOP_CWES = [
+// Export the TOP_CWES constant
+export const TOP_CWES = [
         {
             id: 79,
             name: "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",

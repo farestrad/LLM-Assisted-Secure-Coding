@@ -152,7 +152,7 @@
       "properties": {
         "codeLlama.apiUrl": {
           "type": "string",
-          "default": "http://172.105.25.95:11434/api/generate",
+          "default": "http://34.72.188.73:11434/api/generate",
           "description": "The base URL for the Code Llama API"
         },
         "codeLlama.cveApiUrl": {
