@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 // Class to represent individual AI suggestions
-export class AISuggestion {   
+export class AISuggestion {
     public label: string;
     public status: 'pending' | 'accepted' | 'rejected';
     public originalCode: string;
@@ -10,7 +10,11 @@ export class AISuggestion {
 
     constructor(id: number, suggestion: string, originalCode: string) {
         this.id = id;  // Unique identifier for each suggestion
-        this.label = suggestion.length > 50 ? suggestion.substring(0, 47) + '...' : suggestion;
+        
+        // Sanitize and truncate code for the label
+        const sanitizedCode = suggestion.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+        this.label = sanitizedCode.length > 50 ? sanitizedCode.substring(0, 47) + '...' : sanitizedCode;
+        
         this.status = 'pending'; // Default status is "pending"
         this.suggestion = suggestion;
         this.originalCode = originalCode;
@@ -19,19 +23,23 @@ export class AISuggestion {
     // Return a TreeItem representing this suggestion in the UI
     getTreeItem(): vscode.TreeItem {
         const treeItem = new vscode.TreeItem(`${this.label} (${this.status})`, vscode.TreeItemCollapsibleState.None);
-        treeItem.tooltip = this.suggestion;
-    
+        
+        // Use markdown for syntax highlighting in tooltip
+        const markdownTooltip = new vscode.MarkdownString('```c\n' + this.suggestion + '\n```');
+        markdownTooltip.isTrusted = true;
+        treeItem.tooltip = markdownTooltip;
+        
         // Add unique ID and context value to enable right-click actions (Accept, Reject, Undo)
         treeItem.id = this.id.toString();  // Unique ID used for the command
         treeItem.contextValue = 'suggestion';  // Enable right-click actions
-    
+        
         // Add command for changing status when clicked
         treeItem.command = {
             command: 'extension.toggleSuggestionStatus',  // Command to toggle status
             title: 'Toggle Status',
             arguments: [this],  // Pass the current suggestion as an argument
         };
-    
+        
         return treeItem;
     }
 }
@@ -58,15 +66,12 @@ export class AISuggestionHistoryProvider implements vscode.TreeDataProvider<AISu
 
     // Update the status of an AI suggestion (accept/reject)
     updateAISuggestionStatus(id: number, status: 'accepted' | 'rejected'): void {
-        
         const suggestion = this.suggestions.find(s => s.id === id);
         if (suggestion) {
             suggestion.status = status;
             this.refresh();
         }
     }
-
-  
 
     // Return TreeItem for each AI suggestion
     getTreeItem(element: AISuggestion): vscode.TreeItem {
@@ -78,4 +83,3 @@ export class AISuggestionHistoryProvider implements vscode.TreeDataProvider<AISu
         return this.suggestions;
     }
 }
-

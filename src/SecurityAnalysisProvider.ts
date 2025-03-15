@@ -132,13 +132,18 @@ export const TOP_CWES = [
     
 ] as const;
 
-// This class is for the Security Analysis panel with collapsible sections
 export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
     
+    // Event emitter for security issues updates
+    private _onSecurityIssuesUpdated: vscode.EventEmitter<string[]> = new vscode.EventEmitter<string[]>();
+    readonly onSecurityIssuesUpdated: vscode.Event<string[]> = this._onSecurityIssuesUpdated.event;
+    
     private securityIssues: vscode.TreeItem[] = [];
     private matchedCWEs: vscode.TreeItem[] = [];
+    private rawIssuesText: string[] = []; // Store raw issue text for sharing
+    private isAnalyzing: boolean = false;
 
     constructor(private generatedCodeProvider: GeneratedCodeProvider) {}
 
@@ -149,7 +154,11 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
     clear(): void {
         this.securityIssues = [];
         this.matchedCWEs = [];
+        this.rawIssuesText = [];
         this.refresh();
+        
+        // Fire the event with empty issues to clear the right panel
+        this._onSecurityIssuesUpdated.fire([]);
     }
 
     // Helper function to find matching CWEs based on issue description
@@ -168,8 +177,10 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         });
     }
 
-
     updateSecurityAnalysis(issues: string[]): void {
+        // Store raw issues for sharing with the right panel
+        this.rawIssuesText = [...issues];
+        
         this.securityIssues = issues.map(issue => {
             const item = new vscode.TreeItem(issue);
             item.iconPath = new vscode.ThemeIcon("warning");
@@ -202,6 +213,12 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         });
 
         this.refresh();
+        
+        // Set analyzing state to false now that we have results
+        this.isAnalyzing = false;
+        
+        // Fire the event with the updated issues
+        this._onSecurityIssuesUpdated.fire(this.rawIssuesText);
     }
 
     // Method to run security analysis on the latest generated code
@@ -209,27 +226,65 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         const code = this.generatedCodeProvider.getLatestGeneratedCode();
 
         if (code) {
+            this.isAnalyzing = true;
             this.clear(); // Clear previous analysis results
-            runCTests(code, this); // Run the C tests and update security issues
+            
+            // Notify that analysis is in progress
+            this._onSecurityIssuesUpdated.fire(["Analyzing code for security issues..."]);
+            
+            // Run the C tests and update security issues
+            runCTests(code, this);
         } else {
             vscode.window.showWarningMessage("No code generated to analyze.");
+            // Fire event with no issues found
+            this._onSecurityIssuesUpdated.fire(["No code generated to analyze."]);
         }
+    }
+
+    // Method to analyze arbitrary code (not just generated code)
+    async analyzeCode(code: string): Promise<void> {
+        if (code) {
+            this.isAnalyzing = true;
+            this.clear(); // Clear previous analysis results
+            
+            // Notify that analysis is in progress
+            this._onSecurityIssuesUpdated.fire(["Analyzing code for security issues..."]);
+            
+            // Add a small delay to ensure UI is updated before potentially intensive analysis
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Run the C tests and update security issues
+            runCTests(code, this);
+        } else {
+            vscode.window.showWarningMessage("No code provided to analyze.");
+            // Fire event with no issues found
+            this._onSecurityIssuesUpdated.fire(["No code provided to analyze."]);
+        }
+    }
+
+    // Check if analysis is currently running
+    isAnalysisInProgress(): boolean {
+        return this.isAnalyzing;
     }
 
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
         return element;
     }
 
-    getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
+    getChildren(element?: vscode.TreeItem): vscode.ProviderResult<vscode.TreeItem[]> {
         if (!element) {
             return [
-                new vscode.TreeItem('Security Issues', vscode.TreeItemCollapsibleState.Collapsed),
-                new vscode.TreeItem('CWE Details', vscode.TreeItemCollapsibleState.Collapsed),
+                new vscode.TreeItem('Security Issues', vscode.TreeItemCollapsibleState.Expanded),
+                new vscode.TreeItem('CWE Details', vscode.TreeItemCollapsibleState.Expanded),
             ];
         }
 
         if (element.label === 'Security Issues') {
-            if (this.securityIssues.length > 0) {
+            if (this.isAnalyzing) {
+                const analyzingItem = new vscode.TreeItem("Analyzing code...");
+                analyzingItem.iconPath = new vscode.ThemeIcon("loading~spin");
+                return [analyzingItem];
+            } else if (this.securityIssues.length > 0) {
                 return this.securityIssues;
             } else {
                 const noIssuesItem = new vscode.TreeItem("No security issues found!");
@@ -239,7 +294,11 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         }
 
         if (element.label === 'CWE Details') {
-            if (this.matchedCWEs.length > 0) {
+            if (this.isAnalyzing) {
+                const analyzingItem = new vscode.TreeItem("Analyzing code...");
+                analyzingItem.iconPath = new vscode.ThemeIcon("loading~spin");
+                return [analyzingItem];
+            } else if (this.matchedCWEs.length > 0) {
                 return this.matchedCWEs;
             } else {
                 const noCweItem = new vscode.TreeItem("No matching CWEs found.");
@@ -251,8 +310,13 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         return [];
     }
 
-    updateCveDetails(cveId: string) {
-        // Do nothing for now
+    // This method returns the raw security issues as strings (for external use)
+    getRawSecurityIssues(): string[] {
+        return this.rawIssuesText;
     }
-    
+
+    updateCveDetails(cveId: string) {
+        // This method is kept for compatibility but currently does nothing
+    }
 }
+

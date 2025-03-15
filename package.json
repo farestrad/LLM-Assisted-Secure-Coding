@@ -19,6 +19,7 @@
   "activationEvents": [
     "onCommand:codeLlama.runCodeLlama",
     "onCommand:extension.runSecurityAnalysis",
+    "onCommand:extension.analyzeHighlightedCode",
     "onCommand:extension.testSecurityAnalysis",
     "onCommand:codeLlama.generateCode",
     "onCommand:extension.acceptAISuggestion",
@@ -26,14 +27,29 @@
     "onCommand:extension.triggerAISuggestion",
     "onCommand:extension.acceptCodeChanges",
     "onCommand:extension.toggleAssistantSidebar",
-    "onCommand:extension.fetchCveDetails"
+    "onView:safescriptPanel",
+    "onCommand:extension.fetchCveDetails",
+    "onCommand:extension.safescript.showRightPanel"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
+        "command": "extension.showGettingStartedPanel",
+        "title": "SafeScript: Show Getting Started Guide"
+      },
+      {
         "command": "codeLlama.runCodeLlama",
         "title": "Run Code Llama"
+      },
+      {
+        "command": "extension.analyzeHighlightedCode",
+        "title": "Analyze Highlighted Code for Security Issues",
+        "category": "SafeScript"
+      },
+      {
+        "command": "extension.safescript.showRightPanel",
+        "title": "Show SafeScript Code Analysis and Improvement Panel"
       },
       {
         "command": "codeLlama.generateCode",
@@ -82,6 +98,46 @@
     ],
     "keybindings": [
       {
+        "command": "extension.showGettingStartedPanel",
+        "key": "ctrl+alt+m",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codeLlama.runCodeLlama",
+        "key": "ctrl+alt+l",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.runSecurityAnalysis",
+        "key": "ctrl+alt+r",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.analyzeHighlightedCode",
+        "key": "ctrl+alt+h",
+        "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "extension.testSecurityAnalysis",
+        "key": "ctrl+alt+t",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codeLlama.generateCode",
+        "key": "ctrl+alt+g",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.acceptAISuggestion",
+        "key": "ctrl+alt+1",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.rejectAISuggestion",
+        "key": "ctrl+alt+2",
+        "when": "editorTextFocus"
+      },
+      {
         "command": "extension.triggerAISuggestion",
         "key": "ctrl+alt+s",
         "when": "editorTextFocus"
@@ -100,34 +156,39 @@
         "command": "extension.fetchCveDetails",
         "key": "ctrl+alt+c",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.safescript.showRightPanel",
+        "key": "ctrl+alt+p",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.copyToClipboard",
+        "key": "ctrl+alt+y",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.undoAISuggestion",
+        "key": "ctrl+alt+z",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.acceptGeneratedCode",
+        "key": "ctrl+alt+enter",
+        "when": "editorTextFocus"
       }
     ],
-    "menus": {
-      "view/item/context": [
+    "viewsContainers": {
+      "activitybar": [
         {
-          "command": "extension.acceptAISuggestion",
-          "when": "view == aiSuggestionHistoryView",
-          "group": "inline"
-        },
-        {
-          "command": "extension.rejectAISuggestion",
-          "when": "view == aiSuggestionHistoryView && aiSuggestion == 'pending'",
-          "group": "inline"
-        },
-        {
-          "command": "extension.fetchCveDetails",
-          "when": "view == securityAnalysisView",
-          "group": "inline"
-        },
-        {
-          "command": "extension.acceptGeneratedCode",
-          "when": "view == codeLlamaGeneratedCodeView",
-          "group": "inline"
+          "id": "safescript",
+          "title": "SafeScript",
+          "icon": "assets/SafeScript_logo.png"
         }
       ]
     },
     "views": {
-      "explorer": [
+      "safescript": [
         {
           "id": "codeLlamaGeneratedCodeView",
           "name": "Code Llama Generated Code"
