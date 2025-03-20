@@ -10,7 +10,7 @@ interface CustomShortcut {
 
 // Define all shortcuts based on the package.json contributes section
 const customShortcuts: CustomShortcut[] = [
-    { command: 'codeLlama.runCodeLlama', keybinding: 'ctrl+alt+l', title: 'Run Code Llama', when: 'editorTextFocus' },
+    { command: 'codeLlama.runCodeLlama', keybinding: 'ctrl+alt+l', title: 'Run Safescript', when: 'editorTextFocus' },
     { command: 'extension.runSecurityAnalysis', keybinding: 'ctrl+alt+r', title: 'Run Security Analysis', when: 'editorTextFocus' },
     { command: 'extension.analyzeHighlightedCode', keybinding: 'ctrl+alt+h', title: 'Analyze Highlighted Code', when: 'editorTextFocus && editorHasSelection' },
     { command: 'extension.testSecurityAnalysis', keybinding: 'ctrl+alt+t', title: 'Test Security Analysis', when: 'editorTextFocus' },

@@ -363,7 +363,7 @@ export class GettingStartedPanelProvider {
         <div class="feature-item">
             <div class="feature-title">Code Generation</div>
             <p>Let Code Llama generate secure code snippets based on your requirements and findings from security analysis.</p>
-            <p>Use <kbd>Ctrl+Alt+L</kbd> to run Code Llama</p>
+            <p>Use <kbd>Ctrl+Alt+L</kbd> to Run Safescript</p>
             <p>Use <kbd>Ctrl+Alt+G</kbd> to generate secure code</p>
         </div>
         
@@ -395,7 +395,7 @@ export class GettingStartedPanelProvider {
             <td>Gets you Started With Using SafeScript!</td>
         </tr>
         <tr>
-            <td>Run Code Llama</td>
+            <td>Run Safescript</td>
             <td><kbd>Ctrl+Alt+L</kbd></td>
             <td>Activate the Code Llama AI assistant</td>
         </tr>
