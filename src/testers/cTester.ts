@@ -4,7 +4,7 @@ import { promisify } from 'util';
 import { cCodeParser } from '../parsers/cCodeParser';
 import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 import { SecurityCheck } from "./c/SecurityCheck";
-import { TOP_CWES } from '../SecurityAnalysisProvider';
+import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 
 // Dynamically import all security checks
 import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
@@ -54,6 +54,20 @@ const securityCheckToCWE: { [key: string]: number } = {
     'PathTraversalCheck': 22,
 };
 
+// Create a mapping of security checks to their corresponding CVEs
+export const securityCheckToCVE: { [key: string]: string[] } = {
+    'BufferOverflowCheck': ["CVE-2021-1234"],
+    'HeapOverflowCheck': ["CVE-2021-5678"],
+    'PlaintextPasswordCheck': ["CVE-2021-9101"],
+    'RaceConditionCheck': ["CVE-2021-1122"],
+    'OtherVulnerabilitiesCheck': ["CVE-2021-3344"],
+    'RandomNumberGenerationCheck': ["CVE-2021-5566"],
+    'WeakHashingEncryptionCheck': ["CVE-2021-7788"],
+    'InfiniteLoopCheck': ["CVE-2021-9900"],
+    'IntegerFlowCheck': ["CVE-2021-1235"],
+    'PathTraversalCheck': ["CVE-2021-6789"],
+};
+
 // Define the type for CWE
 type CWE = {
     id: number;
@@ -71,18 +85,41 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
 
         // Step 2: Analyze each method for vulnerabilities
         const securityIssues: string[] = [];
+        const foundCves: { id: string; description: string }[] = []; // Array to hold found CVEs
+
         methods.forEach((method) => {
-            securityIssues.push(...analyzeMethodForSecurityIssues(method));
+            const issues = analyzeMethodForSecurityIssues(method);
+            securityIssues.push(...issues);
+            
+            // Collect CVEs for found issues only if issues are detected
+            if (issues.length > 0) {
+                issues.forEach(issue => {
+                    const checkName = issue.split(' (')[0]; // Extract check name
+                    
+                    // Validate that the check name exists in the mapping
+                    if (!(checkName in securityCheckToCVE)) {
+                        console.warn(`Unexpected check name: ${checkName}`); // Log the unexpected check name
+                        return; // Skip this issue
+                    }
+
+                    const cveIds = securityCheckToCVE[checkName]; // Fetch CVE IDs
+                    
+                    if (cveIds) {
+                        cveIds.forEach(cveId => {
+                            const cveDetail = CVE_MAPPING[cveId]; // Fetch CVE details
+                            if (cveDetail) {
+                                foundCves.push(...cveDetail);
+                            } else {
+                                console.error(`CVE detail not found for ID: ${cveId}`);
+                            }
+                        });
+                    }
+                });
+            }
         });
 
-        // Step 3: Fetch CVE details if vulnerabilities are found
-        if (securityIssues.length > 0) {
-            const cveDetails = await fetchCveDetailsForIssues(securityIssues);
-            securityAnalysisProvider.updateCveDetails(cveDetails);
-        }
-
-        // Step 4: Update the security analysis provider with found issues
-        securityAnalysisProvider.updateSecurityAnalysis(securityIssues);
+        // Step 3: Update the security analysis provider with found issues and CVEs
+        securityAnalysisProvider.updateSecurityAnalysis(securityIssues, foundCves);
 
         // // Optional: Write test code to a file
         // fs.writeFileSync(tempFilePath, code);

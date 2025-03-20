@@ -40,7 +40,7 @@
       },
       {
         "command": "codeLlama.runCodeLlama",
-        "title": "Run Code Llama"
+        "title": "Run Safescript"
       },
       {
         "command": "extension.analyzeHighlightedCode",
