@@ -48,6 +48,13 @@ export class SafeScriptPanelRight {
                         result: result
                     });
                     break;
+                case 'generateCode':
+                    // For code generation mode, we'll just pass the prompt to the LLM directly
+                    SafeScriptPanelRight.postMessage({
+                        command: 'generationRequested',
+                        prompt: message.prompt
+                    });
+                    break;
                 case 'improvedCodeGenerated':
                     // Add improved code to the AI Suggestion History
                     if (SafeScriptPanelRight.aiSuggestionHistoryProvider) {
@@ -279,16 +286,51 @@ export class SafeScriptPanelRight {
     .action-button.primary:hover {
       background: #429652;
     }
+    /* Toggle switch styles */
+    .toggle-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 8px;
+      background: var(--card-bg);
+      border-radius: 4px;
+    }
+    .toggle-option {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: center;
+      flex: 1;
+      transition: all 0.2s;
+    }
+    .toggle-option.active {
+      background: var(--primary);
+      color: white;
+    }
+    .toggle-option:not(.active) {
+      background: transparent;
+      color: var(--text-color);
+    }
+    .toggle-option:not(.active):hover {
+      background: rgba(255,255,255,0.05);
+    }
   </style>
 </head>
 <body>
-<div id="statusIndicator" style="visibility: hidden;"></div>
+  <div class="toggle-container">
+    <div id="analyzeToggle" class="toggle-option active">Analyze & Improve</div>
+    <div id="generateToggle" class="toggle-option">Generate Code</div>
+  </div>
+
+  <div id="statusIndicator" style="visibility: hidden;"></div>
   
   <div id="chatContainer" class="card">
     <div class="empty-state">
       <div class="empty-state-icon">💻</div>
       <h3>Welcome to SafeScript</h3>
-      <p>Enter C code below to analyze and improve security.</p>
+      <p id="emptyStateText">Enter C code below to analyze and improve security.</p>
     </div>
   </div>
   
@@ -296,7 +338,7 @@ export class SafeScriptPanelRight {
     <textarea id="messageInput" placeholder="Enter your C code here..."></textarea>
     <div id="error-message" class="error-message">Invalid C code. Please check syntax.</div>
     <div id="buttonContainer">
-      <div class="c-code-info">Enter valid C code for best results</div>
+      <div id="inputInfo" class="c-code-info">Enter valid C code for best results</div>
       <button id="clearButton" class="button">Clear</button>
       <button id="sendButton" class="button">Analyze & Improve</button>
     </div>
@@ -308,6 +350,7 @@ export class SafeScriptPanelRight {
     let isProcessing = false;
     let currentUserCode = "";
     let currentImprovedCode = "";
+    let isGenerateMode = false;
     
     const issuesContainer = document.getElementById('issuesContainer');
     const statusIndicator = document.getElementById('statusIndicator');
@@ -317,6 +360,45 @@ export class SafeScriptPanelRight {
     const clearButton = document.getElementById('clearButton');
     const errorMessage = document.getElementById('error-message');
     const emptyState = document.querySelector('.empty-state');
+    const emptyStateText = document.getElementById('emptyStateText');
+    const inputInfo = document.getElementById('inputInfo');
+    const analyzeToggle = document.getElementById('analyzeToggle');
+    const generateToggle = document.getElementById('generateToggle');
+
+    // Toggle mode handlers
+    analyzeToggle.addEventListener('click', () => {
+      if (isGenerateMode) {
+        switchToAnalyzeMode();
+      }
+    });
+
+    generateToggle.addEventListener('click', () => {
+      if (!isGenerateMode) {
+        switchToGenerateMode();
+      }
+    });
+
+    function switchToAnalyzeMode() {
+      isGenerateMode = false;
+      analyzeToggle.classList.add('active');
+      generateToggle.classList.remove('active');
+      sendButton.textContent = 'Analyze & Improve';
+      messageInput.placeholder = 'Enter your C code here...';
+      emptyStateText.textContent = 'Enter C code below to analyze and improve security.';
+      inputInfo.textContent = 'Enter valid C code for best results';
+      errorMessage.textContent = 'Invalid C code. Please check syntax.';
+    }
+
+    function switchToGenerateMode() {
+      isGenerateMode = true;
+      generateToggle.classList.add('active');
+      analyzeToggle.classList.remove('active');
+      sendButton.textContent = 'Generate Code';
+      messageInput.placeholder = 'Describe the C code you want to generate...';
+      emptyStateText.textContent = 'Describe the C code you want to generate.';
+      inputInfo.textContent = 'Be specific about the functionality you need';
+      errorMessage.textContent = 'Please provide a clear description of the code to generate.';
+    }
 
     window.addEventListener('message', event => {
       const message = event.data;
@@ -333,8 +415,14 @@ export class SafeScriptPanelRight {
       
       if (message.command === 'analysisComplete') {
         statusIndicator.style.display = 'none';
-        if (isProcessing) {
+        if (isProcessing && !isGenerateMode) {
           generateImprovedCode();
+        }
+      }
+
+      if (message.command === 'generationRequested') {
+        if (isProcessing && isGenerateMode) {
+          generateNewCode(message.prompt);
         }
       }
     });
@@ -343,7 +431,7 @@ export class SafeScriptPanelRight {
       vscode.postMessage({ command: 'getIssues' });
     });
 
-    function appendBubble(type, text, showActions = false) {
+    function appendBubble(type, text, showActions = false, isGenerated = false) {
       if (emptyState && !emptyState.classList.contains('hidden')) {
         emptyState.classList.add('hidden');
       }
@@ -359,7 +447,8 @@ export class SafeScriptPanelRight {
       bubble.textContent = text;
       wrapper.appendChild(bubble);
       
-      if (showActions && type === 'bot') {
+      // Only show "Add to Suggestion History" button for improved code (not generated code)
+      if (showActions && type === 'bot' && !isGenerated) {
         const actionButtons = document.createElement('div');
         actionButtons.classList.add('action-buttons');
         
@@ -389,7 +478,40 @@ export class SafeScriptPanelRight {
           });
         });
         
-        actionButtons.appendChild(addToHistoryBtn);
+        // Only add the "Add to Suggestion History" button for improved code
+        if (!isGenerated) {
+          actionButtons.appendChild(addToHistoryBtn);
+        }
+        actionButtons.appendChild(copyBtn);
+        wrapper.appendChild(actionButtons);
+      } else if (showActions && type === 'bot' && isGenerated) {
+        // For generated code, only show the copy button
+        const actionButtons = document.createElement('div');
+        actionButtons.classList.add('action-buttons');
+        
+        const copyBtn = document.createElement('button');
+        copyBtn.classList.add('action-button');
+        copyBtn.textContent = 'Copy Code';
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+              copyBtn.textContent = 'Copy Code';
+            }, 2000);
+          });
+        });
+        
+        const analyzeBtn = document.createElement('button');
+        analyzeBtn.classList.add('action-button', 'primary');
+        analyzeBtn.textContent = 'Analyze This Code';
+        analyzeBtn.addEventListener('click', () => {
+          switchToAnalyzeMode();
+          messageInput.value = text;
+          // Focus on the send button to encourage user to click it
+          sendButton.focus();
+        });
+        
+        actionButtons.appendChild(analyzeBtn);
         actionButtons.appendChild(copyBtn);
         wrapper.appendChild(actionButtons);
       }
@@ -412,6 +534,11 @@ export class SafeScriptPanelRight {
     }
     
     function isLikelyCCode(code) {
+      if (isGenerateMode) {
+        // In generate mode, we accept any input as a prompt
+        return true;
+      }
+      
       if (code.includes('#include') || 
           /\b(int|char|float|double|void|struct|if|for|while|return|malloc|free|printf)\b/.test(code)) {
         return true;
@@ -423,12 +550,12 @@ export class SafeScriptPanelRight {
     }
 
     sendButton.addEventListener('click', async () => {
-      const userCode = messageInput.value.trim();
-      if (!userCode) { return; }
+      const userInput = messageInput.value.trim();
+      if (!userInput) { return; }
       
       errorMessage.style.display = 'none';
       
-      if (!isLikelyCCode(userCode)) {
+      if (!isLikelyCCode(userInput) && !isGenerateMode) {
         errorMessage.style.display = 'block';
         return;
       }
@@ -436,18 +563,26 @@ export class SafeScriptPanelRight {
       isProcessing = true;
       sendButton.disabled = true;
       
-      // Store the original user code
-      currentUserCode = userCode;
+      // Store the original user code/prompt
+      currentUserCode = userInput;
       
-      appendBubble('user', userCode);
+      appendBubble('user', userInput);
       messageInput.value = '';
       
-      appendBubble('status', '🔍 Analyzing code...');
-      
-      vscode.postMessage({
-        command: 'analyzeCode',
-        code: userCode
-      });
+      if (isGenerateMode) {
+        appendBubble('status', '✏️ Generating C code...');
+        
+        // For code generation, we'll handle it directly
+        generateNewCode(userInput);
+      } else {
+        appendBubble('status', '🔍 Analyzing code...');
+        
+        // For analysis, send to VSCode extension
+        vscode.postMessage({
+          command: 'analyzeCode',
+          code: userInput
+        });
+      }
     });
     
     clearButton.addEventListener('click', () => {
@@ -465,7 +600,7 @@ export class SafeScriptPanelRight {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             model: 'llama3', 
-            prompt: \`Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c  on top, no backticks, just pure c code output . Write the C code to accomplish the following task: Improve the following C code to address these security issues:
+            prompt: \`Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code. Write the C code to accomplish the following task: Improve the following C code to address these security issues:
  Security Issues:
   \${detectedIssues}
 
@@ -487,7 +622,46 @@ export class SafeScriptPanelRight {
         currentImprovedCode = jsonReply.response || 'No reply received';
         
         // Add the bot bubble with action buttons
-        appendBubble('bot', currentImprovedCode, true);
+        appendBubble('bot', currentImprovedCode, true, false);
+      } catch (error) {
+        removeLastBubbleIfLoading();
+        appendBubble('bot', '❌ Error: ' + error.message);
+      } finally {
+        sendButton.disabled = false;
+        isProcessing = false;
+      }
+    }
+    
+    async function generateNewCode(prompt) {
+      removeLastBubbleIfLoading();
+      appendBubble('status', '✏️ Generating C code from prompt...');
+      
+      try {
+        const response = await fetch('http://34.72.188.73:11434/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            model: 'llama3', 
+            prompt: \`Generate C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code:
+            
+  \${prompt}\`, 
+            stream: false 
+          }),
+          timeout: 30000
+        });
+        
+        if (!response.ok) { 
+          throw new Error('Error generating code'); 
+        }
+        
+        const jsonReply = await response.json();
+        removeLastBubbleIfLoading();
+        
+        // Generated code (not improved)
+        const generatedCode = jsonReply.response || 'No reply received';
+        
+        // Add the bot bubble with only a copy button (not added to history)
+        appendBubble('bot', generatedCode, true, true);
       } catch (error) {
         removeLastBubbleIfLoading();
         appendBubble('bot', '❌ Error: ' + error.message);
@@ -514,6 +688,3 @@ export class SafeScriptPanelRight {
         }
     }
 }
-
-
-

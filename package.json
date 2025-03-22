@@ -29,7 +29,8 @@
     "onCommand:extension.toggleAssistantSidebar",
     "onView:safescriptPanel",
     "onCommand:extension.fetchCveDetails",
-    "onCommand:extension.safescript.showRightPanel"
+    "onCommand:extension.safescript.showRightPanel",
+    "onCommand:extension.copySuggestion"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -94,6 +95,10 @@
       {
         "command": "extension.acceptGeneratedCode",
         "title": "Accept Code"
+      },
+      {
+        "command": "extension.copySuggestion",
+        "title": "Copy Suggestion"
       }
     ],
     "keybindings": [
@@ -128,31 +133,6 @@
         "when": "editorTextFocus"
       },
       {
-        "command": "extension.acceptAISuggestion",
-        "key": "ctrl+alt+1",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "extension.rejectAISuggestion",
-        "key": "ctrl+alt+2",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "extension.triggerAISuggestion",
-        "key": "ctrl+alt+s",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "extension.acceptCodeChanges",
-        "key": "ctrl+alt+a",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "extension.toggleAssistantSidebar",
-        "key": "ctrl+alt+d",
-        "when": "editorTextFocus"
-      },
-      {
         "command": "extension.fetchCveDetails",
         "key": "ctrl+alt+c",
         "when": "editorTextFocus"
@@ -166,16 +146,6 @@
         "command": "extension.copyToClipboard",
         "key": "ctrl+alt+y",
         "when": "editorTextFocus"
-      },
-      {
-        "command": "extension.undoAISuggestion",
-        "key": "ctrl+alt+z",
-        "when": "editorTextFocus"
-      },
-      {
-        "command": "extension.acceptGeneratedCode",
-        "key": "ctrl+alt+enter",
-        "when": "editorTextFocus"
       }
     ],
     "viewsContainers": {
@@ -183,16 +153,12 @@
         {
           "id": "safescript",
           "title": "SafeScript",
-          "icon": "assets/SafeScript_logo.png"
+          "icon": "assets/SafeScript_logo_Enlarged.png"
         }
       ]
     },
     "views": {
       "safescript": [
-        {
-          "id": "codeLlamaGeneratedCodeView",
-          "name": "Code Llama Generated Code"
-        },
         {
           "id": "securityAnalysisView",
           "name": "Security Analysis"
@@ -200,10 +166,15 @@
         {
           "id": "aiSuggestionHistoryView",
           "name": "AI Suggestions History"
-        },
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
         {
-          "id": "cveDetailsView",
-          "name": "CVE Details"
+          "command": "extension.copySuggestion",
+          "when": "view == aiSuggestionHistoryView && viewItem == suggestion",
+          "group": "inline"
         }
       ]
     },

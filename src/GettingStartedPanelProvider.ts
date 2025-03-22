@@ -260,6 +260,27 @@ export class GettingStartedPanelProvider {
         .step-content strong {
             color: var(--vscode-activityBarBadge-background);
         }
+        .toggle-preview {
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 20px;
+            display: flex;
+            overflow: hidden;
+            width: 300px;
+            margin: 0 auto;
+        }
+        .toggle-option {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .toggle-active {
+            background-color: var(--vscode-activityBarBadge-background);
+            color: var(--vscode-editor-background);
+            font-weight: 500;
+        }
         .analysis-sample {
             background-color: rgba(var(--vscode-activityBarBadge-background), 0.1);
             border: 1px solid var(--vscode-panel-border);
@@ -269,6 +290,17 @@ export class GettingStartedPanelProvider {
             font-family: monospace;
             font-size: 0.9em;
             color: var(--vscode-editor-foreground);
+        }
+        .features-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .features-column {
+            flex: 1;
+            min-width: 300px;
         }
         footer {
             margin-top: 40px;
@@ -281,66 +313,116 @@ export class GettingStartedPanelProvider {
     </style>
 </head>
 <body>
-    <h1>Welcome to SafeScript</h1>
+    <h1>SafeScript</h1>
     
     <div class="hero">
         <div class="hero-content">
-            <p>SafeScript enhances VS Code with Code Llama for AI-powered code analysis and security vulnerability detection. Write safer, more secure code by automatically identifying potential security issues in your code and generating more secure alternatives.</p>
+            <p>AI-powered code security analysis and generation for VS Code. Identify vulnerabilities in your code and generate secure alternatives with Code Llama.</p>
         </div>
     </div>
 
-    <h2>Understanding the SafeScript Experience</h2>
+    <h2>Dual-Mode Interface</h2>
+    
+    <div class="panel-preview">
+        <div class="panel-header">Mode Selector</div>
+        <div class="panel-body">
+            <p>SafeScript features a dual-mode interface to better serve your development workflow:</p>
+            
+            <div class="toggle-preview">
+                <div class="toggle-option toggle-active">Analyze & Improve</div>
+                <div class="toggle-option">Generate Code</div>
+            </div>
+            
+            <p><span class="text-highlight">Analyze & Improve:</span> For analyzing existing code and finding security vulnerabilities.</p>
+            
+            <p><span class="text-highlight">Generate Code:</span> Quickly generate secure C code based on your requirements that you can later analyze.</p>
+        </div>
+    </div>
+
+    <div class="tip">
+        Switch between modes using the toggle at the top of the panel. Each mode has context-specific buttons and placeholder text to guide you.
+    </div>
+
+    <div class="features-container">
+        <div class="features-column">
+            <h2>Core Features</h2>
+            <div class="grid">
+                <div class="feature-item">
+                    <div class="feature-title">Security Analysis</div>
+                    <p>Scan your code for potential security vulnerabilities like buffer overflows, memory leaks, and more.</p>
+                    <p>Use <kbd>Ctrl+Alt+R</kbd> for entire file, <kbd>Ctrl+Alt+H</kbd> for selected code</p>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-title">Code Generation</div>
+                    <p>Generate secure C code from natural language descriptions with the dedicated code generation interface.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="features-column">
+            <h2>Advanced Tools</h2>
+            <div class="grid">
+                <div class="feature-item">
+                    <div class="feature-title">CVE Database</div>
+                    <p>Look up information about known vulnerabilities from the CVE database.</p>
+                    <p>Use <kbd>Ctrl+Alt+C</kbd> to fetch CVE details</p>
+                </div>
+                
+                <div class="feature-item">
+                    <div class="feature-title">AI Suggestion History</div>
+                    <p>Track and manage your history of AI-generated code improvements.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2>Complete Workflow</h2>
     
     <div class="card">
-        <h3>Security Analysis & Improvement Workflow</h3>
+        <h3>Generate & Analyze Workflow</h3>
         
         <div class="workflow-step">
             <div class="step-number">1</div>
             <div class="step-content">
-                <strong>Analyze your code:</strong> SafeScript scans your code for potential security vulnerabilities like buffer overflows, memory leaks, and injection vulnerabilities.
+                <strong>Select your mode</strong> using the toggle at the top of the interface (Generate Code or Analyze & Improve).
             </div>
         </div>
         
         <div class="workflow-step">
             <div class="step-number">2</div>
             <div class="step-content">
-                <strong>Review identified issues:</strong> The analysis results appear in the Security Analysis panel, highlighting specific vulnerabilities and risky coding patterns.
+                <strong>Generate or import code</strong> - Either describe the code you need to generate or paste existing code for analysis.
             </div>
         </div>
         
         <div class="workflow-step">
             <div class="step-number">3</div>
             <div class="step-content">
-                <strong>Generate safer alternatives:</strong> Code Llama suggests more secure code alternatives that address the identified vulnerabilities.
+                <strong>Review analysis results</strong> - See detected vulnerabilities and their details or examine generated code.
             </div>
         </div>
         
         <div class="workflow-step">
             <div class="step-number">4</div>
             <div class="step-content">
-                <strong>Track suggestions:</strong> All AI-generated code suggestions are stored in your suggestion history for later reference.
+                <strong>Implement security improvements</strong> - Apply generated secure code or suggested fixes to your project.
             </div>
         </div>
     </div>
 
-    <div class="tip">
-        For more targeted analysis, select specific sections of code and use <kbd>Ctrl+Alt+H</kbd> to analyze just the highlighted portion.
-    </div>
-
-    <h2>The SafeScript Analysis & Improvement Panel</h2>
+    <h2>Interface Overview</h2>
     
     <div class="panel-preview">
-        <div class="panel-header">SafeScript Code Analysis and Improvement Panel</div>
+        <div class="panel-header">SafeScript Panel Features</div>
         <div class="panel-body">
-            <p>The SafeScript panel provides an interactive workspace for analyzing and improving your code:</p>
+            <p><span class="text-highlight">Mode-Specific UI:</span> The interface adapts based on your selected mode:</p>
             
-            <p><span class="text-highlight">Security Analysis Section:</span> Displays detected vulnerabilities and security issues in your code.</p>
+            <p><span class="text-highlight">Generate Code Mode:</span> Shows "Copy Code" and "Analyze This Code" buttons for generated content.</p>
             
-            <p><span class="text-highlight">Code Input Area:</span> Enter your C code here for analysis.</p>
+            <p><span class="text-highlight">Analyze & Improve Mode:</span> Provides full suggestion management with "Add to Suggestion History" option.</p>
             
-            <p><span class="text-highlight">Analysis Results:</span> View the issues found in your code along with suggested improvements.</p>
-            
-            <p><span class="text-highlight">AI-Generated Improvements:</span> Get secure alternatives that address the identified vulnerabilities.</p>
+            <p><span class="text-highlight">Security Analysis:</span> Displays vulnerabilities with detailed descriptions.</p>
             
             <div class="analysis-sample">
             // Security Issues:
@@ -351,124 +433,43 @@ export class GettingStartedPanelProvider {
         </div>
     </div>
 
-    <h2>Key Features</h2>
-    <div class="grid">
-        <div class="feature-item">
-            <div class="feature-title">Security Analysis</div>
-            <p>Scan your code for potential security vulnerabilities and get detailed remediation advice.</p>
-            <p>Use <kbd>Ctrl+Alt+R</kbd> to run analysis on entire file</p>
-            <p>Use <kbd>Ctrl+Alt+H</kbd> to analyze highlighted code</p>
-        </div>
-        
-        <div class="feature-item">
-            <div class="feature-title">Code Generation</div>
-            <p>Let Code Llama generate secure code snippets based on your requirements and findings from security analysis.</p>
-            <p>Use <kbd>Ctrl+Alt+L</kbd> to Run Safescript</p>
-            <p>Use <kbd>Ctrl+Alt+G</kbd> to generate secure code</p>
-        </div>
-        
-        <div class="feature-item">
-            <div class="feature-title">CVE Database</div>
-            <p>Look up information about known vulnerabilities from the CVE database to understand potential risks.</p>
-            <p>Use <kbd>Ctrl+Alt+C</kbd> to fetch CVE details</p>
-        </div>
-        
-        <div class="feature-item">
-            <div class="feature-title">AI Suggestions</div>
-            <p>View, accept, or reject AI-generated code suggestions and track your improvement history.</p>
-            <p>Use <kbd>Ctrl+Alt+S</kbd> to trigger AI suggestion</p>
-            <p>Use <kbd>Ctrl+Alt+A</kbd> to accept code changes</p>
-        </div>
-    </div>
-
-    <h2>Keyboard Shortcuts</h2>
+    <h2>Key Shortcuts</h2>
     
     <table class="shortcut-table">
         <tr>
             <th>Action</th>
             <th>Shortcut</th>
-            <th>Description</th>
         </tr>
         <tr>
             <td>Show Getting Started Panel</td>
             <td><kbd>Ctrl+Alt+M</kbd></td>
-            <td>Gets you Started With Using SafeScript!</td>
         </tr>
         <tr>
-            <td>Run Safescript</td>
-            <td><kbd>Ctrl+Alt+L</kbd></td>
-            <td>Activate the Code Llama AI assistant</td>
+            <td>Show Analysis and Improvement Panel</td>
+            <td><kbd>Ctrl+Alt+P</kbd></td>
         </tr>
         <tr>
             <td>Run Security Analysis</td>
             <td><kbd>Ctrl+Alt+R</kbd></td>
-            <td>Analyze current file for security vulnerabilities</td>
         </tr>
         <tr>
             <td>Analyze Highlighted Code</td>
             <td><kbd>Ctrl+Alt+H</kbd></td>
-            <td>Run analysis on selected code portion only</td>
-        </tr>
-        <tr>
-            <td>Trigger AI Suggestion</td>
-            <td><kbd>Ctrl+Alt+S</kbd></td>
-            <td>Request AI to provide code improvement suggestions</td>
-        </tr>
-        <tr>
-            <td>Accept Code Changes</td>
-            <td><kbd>Ctrl+Alt+A</kbd></td>
-            <td>Apply suggested code improvements</td>
-        </tr>
-        <tr>
-            <td>Toggle Assistant Sidebar</td>
-            <td><kbd>Ctrl+Alt+D</kbd></td>
-            <td>Show/hide the SafeScript sidebar</td>
         </tr>
         <tr>
             <td>Fetch CVE Details</td>
             <td><kbd>Ctrl+Alt+C</kbd></td>
-            <td>Search the CVE database for vulnerability information</td>
-        </tr>
-        <tr>
-            <td>Accept AI Suggestion</td>
-            <td><kbd>Ctrl+Alt+1</kbd></td>
-            <td>Accept the current AI suggestion</td>
-        </tr>
-        <tr>
-            <td>Reject AI Suggestion</td>
-            <td><kbd>Ctrl+Alt+2</kbd></td>
-            <td>Discard the current AI suggestion</td>
         </tr>
     </table>
 
-    <h2>Analysis Panel Deep Dive</h2>
+    <h2>Best Practices</h2>
     
-    <div class="card">
-        <h3>How the Analysis Panel Works</h3>
-        <p>The SafeScript Code Analysis and Improvement Panel is where most of your security work happens:</p>
-        
-        <ol>
-            <li><strong>Security Analysis Section:</strong> This area displays detected vulnerabilities in easy-to-understand language, focusing on high-risk issues first.</li>
-            <li><strong>Code Input:</strong> Paste your C code or use the keyboard shortcut to analyze your current file.</li>
-            <li><strong>Analysis Results:</strong> View the detailed findings, including specific line numbers and vulnerability descriptions.</li>
-            <li><strong>AI-Generated Improvements:</strong> Code Llama suggests secure alternatives that address each identified vulnerability.</li>
-            <li><strong>Suggestion Management:</strong> Add promising code improvements to your suggestion history for later reference or implementation.</li>
-        </ol>
-        
-        <p>The panel performs static analysis on your code to detect:</p>
-        <ul>
-            <li>Buffer overflow vulnerabilities</li>
-            <li>Memory leaks</li>
-            <li>Use-after-free issues</li>
-            <li>Format string vulnerabilities</li>
-            <li>Integer overflow/underflow risks</li>
-            <li>Injection vulnerabilities</li>
-            <li>And many other common security issues</li>
-        </ul>
+    <div class="tip">
+        Run security analysis frequently during development, not just at the end. Address high-severity vulnerabilities first and study the AI-suggested improvements to learn secure coding patterns.
     </div>
 
     <div class="tip">
-        The Analysis Panel works best with C code but can also provide security insights for C++, JavaScript, Python, and other languages. Language-specific vulnerabilities are automatically detected based on the code syntax.
+        The "Generate Code" mode is perfect for quickly creating secure code snippets that follow best practices, which you can then further analyze and refine.
     </div>
 
     <h2>Views & Panels</h2>
@@ -477,18 +478,10 @@ export class GettingStartedPanelProvider {
     <div class="panel-preview">
         <div class="panel-header">Available SafeScript Views</div>
         <div class="panel-body">
-            <p><span class="text-highlight">Code Llama Generated Code:</span> View AI-generated code suggestions with security improvements</p>
-            
-            <p><span class="text-highlight">Security Analysis:</span> Results of security scans on your code with detailed vulnerability descriptions</p>
+            <p><span class="text-highlight">Security Analysis:</span> Results of security scans with detailed vulnerability descriptions</p>
             
             <p><span class="text-highlight">AI Suggestions History:</span> Track your history of AI suggestions and implementation status</p>
-            
-            <p><span class="text-highlight">CVE Details:</span> Information about Common Vulnerabilities and Exposures from the CVE database</p>
         </div>
-    </div>
-
-    <div class="tip">
-        You can toggle the SafeScript sidebar using <kbd>Ctrl+Alt+D</kbd> to give yourself more screen space when needed. This hides the panels temporarily without closing your current analysis session.
     </div>
     
     <h2>Getting the Most from SafeScript</h2>
@@ -505,7 +498,7 @@ export class GettingStartedPanelProvider {
     </div>
 
     <footer>
-        SafeScript: Making secure code development easier and more accessible
+        SafeScript: Making secure code development simpler and more accessible
     </footer>
 
     <script>

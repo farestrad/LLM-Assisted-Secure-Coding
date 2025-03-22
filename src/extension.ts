@@ -39,9 +39,17 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(rightPanelCommand);
 
     // Register tree data providers for the sub-modules
-    vscode.window.registerTreeDataProvider('codeLlamaGeneratedCodeView', generatedCodeProvider);
     vscode.window.registerTreeDataProvider('securityAnalysisView', securityAnalysisProvider);
     vscode.window.registerTreeDataProvider('aiSuggestionHistoryView', aiSuggestionHistoryProvider);
+
+    // Register the copy suggestion command for AI suggestion history
+    const copySuggestionCommand = vscode.commands.registerCommand('extension.copySuggestion', (suggestion: AISuggestion) => {
+        if (suggestion) {
+            vscode.env.clipboard.writeText(suggestion.suggestion);
+            vscode.window.showInformationMessage('Suggestion copied to clipboard');
+        }
+    });
+    context.subscriptions.push(copySuggestionCommand);
 
     // Set up a listener for security analysis updates
     securityAnalysisProvider.onSecurityIssuesUpdated((issues: string[]) => {
@@ -206,7 +214,7 @@ export function activate(context: vscode.ExtensionContext) {
                 },
                 body: JSON.stringify({
                     model: 'llama3',
-                    prompt: `Only provide the C code with no additional explanation, comments, no backticks, NO extra text, and do not write the letter c  on top . Write the C code to accomplish the following task: ${selectedText}`,
+                    prompt: `Only provide the C code with no additional explanation, comments, backticks, NO extra text, and do not write the letter c on top. Write only pure C code to accomplish the following task: ${selectedText}`,
                     stream: true,
                 }),
             });
@@ -231,10 +239,6 @@ export function activate(context: vscode.ExtensionContext) {
 
                         // Trigger security analysis on the generated code
                         securityAnalysisProvider.analyzeLatestGeneratedCode();
-                    }
-
-                    if (jsonChunk.done) {
-                        aiSuggestionHistoryProvider.addAISuggestion(partialResponse, selectedText);
                     }
                 } catch (error) {
                     const err = error as Error;
