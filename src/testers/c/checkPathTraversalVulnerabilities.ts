@@ -88,7 +88,7 @@ export class PathTraversalCheck implements SecurityCheck {
                     const isTraversal = rawPatterns.some(p => firstArg.includes(p));
                     const isSafe = isSanitized(firstArg, methodBody);
                 
-                    if (isTraversal && !isSafe) {
+                    if (!isSafe) {
                         riskyFunctionCalls.add(fnName);
                         issues.push(
                             `Warning: Path traversal risk — argument "${firstArg}" is passed to sensitive function "${fnName}" in method "${methodName}"`
@@ -115,11 +115,13 @@ export class PathTraversalCheck implements SecurityCheck {
             {
                 pattern: /\b(exec|system|popen)\s*\(\s*([^)]+)\s*\)/g,
                 handler: (fn: string, arg: string) => {
-                    if (!isSanitized(arg, methodBody) && rawPatterns.some(p => arg.includes(p))) {
+                    // Always warn on unsanitized user input, regardless of content
+                    if (!isSanitized(arg, methodBody)) {
                         return `Untrusted input "${arg}" passed to command execution function "${fn}" in method "${methodName}". This may enable path traversal or code execution.`;
                     }
                     return null;
                 }
+
             },
             {
                 pattern: /\b(include|require)\s*\(\s*([^)]+)\s*\)/g,
