@@ -19,6 +19,7 @@
   "activationEvents": [
     "onCommand:codeLlama.runCodeLlama",
     "onCommand:extension.runSecurityAnalysis",
+    "onCommand:extension.analyzeHighlightedCode",
     "onCommand:extension.testSecurityAnalysis",
     "onCommand:codeLlama.generateCode",
     "onCommand:extension.acceptAISuggestion",
@@ -26,14 +27,30 @@
     "onCommand:extension.triggerAISuggestion",
     "onCommand:extension.acceptCodeChanges",
     "onCommand:extension.toggleAssistantSidebar",
-    "onCommand:extension.fetchCveDetails"
+    "onView:safescriptPanel",
+    "onCommand:extension.fetchCveDetails",
+    "onCommand:extension.safescript.showRightPanel",
+    "onCommand:extension.copySuggestion"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
+        "command": "extension.showGettingStartedPanel",
+        "title": "SafeScript: Show Getting Started Guide"
+      },
+      {
         "command": "codeLlama.runCodeLlama",
-        "title": "Run Code Llama"
+        "title": "Run Safescript"
+      },
+      {
+        "command": "extension.analyzeHighlightedCode",
+        "title": "Analyze Highlighted Code for Security Issues",
+        "category": "SafeScript"
+      },
+      {
+        "command": "extension.safescript.showRightPanel",
+        "title": "Show SafeScript Code Analysis and Improvement Panel"
       },
       {
         "command": "codeLlama.generateCode",
@@ -74,55 +91,74 @@
       {
         "command": "extension.fetchCveDetails",
         "title": "Fetch CVE Details"
+      },
+      {
+        "command": "extension.acceptGeneratedCode",
+        "title": "Accept Code"
+      },
+      {
+        "command": "extension.copySuggestion",
+        "title": "Copy Suggestion"
       }
     ],
     "keybindings": [
       {
-        "command": "extension.triggerAISuggestion",
-        "key": "ctrl+alt+s",
+        "command": "extension.showGettingStartedPanel",
+        "key": "ctrl+alt+m",
         "when": "editorTextFocus"
       },
       {
-        "command": "extension.acceptCodeChanges",
-        "key": "ctrl+alt+a",
+        "command": "codeLlama.runCodeLlama",
+        "key": "ctrl+alt+l",
         "when": "editorTextFocus"
       },
       {
-        "command": "extension.toggleAssistantSidebar",
-        "key": "ctrl+alt+d",
+        "command": "extension.runSecurityAnalysis",
+        "key": "ctrl+alt+r",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.analyzeHighlightedCode",
+        "key": "ctrl+alt+h",
+        "when": "editorTextFocus && editorHasSelection"
+      },
+      {
+        "command": "extension.testSecurityAnalysis",
+        "key": "ctrl+alt+t",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "codeLlama.generateCode",
+        "key": "ctrl+alt+g",
         "when": "editorTextFocus"
       },
       {
         "command": "extension.fetchCveDetails",
         "key": "ctrl+alt+c",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.safescript.showRightPanel",
+        "key": "ctrl+alt+p",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "extension.copyToClipboard",
+        "key": "ctrl+alt+y",
+        "when": "editorTextFocus"
       }
     ],
-    "menus": {
-      "view/item/context": [
+    "viewsContainers": {
+      "activitybar": [
         {
-          "command": "extension.acceptAISuggestion",
-          "when": "view == aiSuggestionHistoryView && aiSuggestion == 'pending'",
-          "group": "inline"
-        },
-        {
-          "command": "extension.rejectAISuggestion",
-          "when": "view == aiSuggestionHistoryView && aiSuggestion == 'pending'",
-          "group": "inline"
-        },
-        {
-          "command": "extension.fetchCveDetails",
-          "when": "view == securityAnalysisView",
-          "group": "inline"
+          "id": "safescript",
+          "title": "SafeScript",
+          "icon": "assets/SafeScript_logo_Enlarged.png"
         }
       ]
     },
     "views": {
-      "explorer": [
-        {
-          "id": "codeLlamaGeneratedCodeView",
-          "name": "Code Llama Generated Code"
-        },
+      "safescript": [
         {
           "id": "securityAnalysisView",
           "name": "Security Analysis"
@@ -130,10 +166,15 @@
         {
           "id": "aiSuggestionHistoryView",
           "name": "AI Suggestions History"
-        },
+        }
+      ]
+    },
+    "menus": {
+      "view/item/context": [
         {
-          "id": "cveDetailsView",
-          "name": "CVE Details"
+          "command": "extension.copySuggestion",
+          "when": "view == aiSuggestionHistoryView && viewItem == suggestion",
+          "group": "inline"
         }
       ]
     },
@@ -143,7 +184,7 @@
       "properties": {
         "codeLlama.apiUrl": {
           "type": "string",
-          "default": "http://172.105.25.95:11434/api/generate",
+          "default": "http://34.72.188.73:11434/api/generate",
           "description": "The base URL for the Code Llama API"
         },
         "codeLlama.cveApiUrl": {
@@ -191,6 +232,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "amplitude-js": "^8.21.9",
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
     "node-fetch": "^2.7.0",

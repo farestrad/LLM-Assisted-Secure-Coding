@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import Parser from 'tree-sitter';
 import C from 'tree-sitter-c';
-const outputChannel = vscode.window.createOutputChannel("C Parser"); // ✅ Create once and reuse
+const outputChannel = vscode.window.createOutputChannel("C Parser"); // Create once and reuse
 
 export class CCodeParser {
     private static parser: Parser;
@@ -111,5 +111,5 @@ function logParsedFunction(func: {
     outputChannel.appendLine(`    Line Number: ${func.lineNumber}`);
     outputChannel.appendLine(`    Function Calls: ${func.functionCalls.join(", ") || "None"}`);
     outputChannel.appendLine(`    Function Body:\n${func.functionBody}`);
-    outputChannel.appendLine("───────────────────────────────────────────────"); // ✅ Separator for readability
+    outputChannel.appendLine("───────────────────────────────────────────────"); // Separator for readability
 }

@@ -40,17 +40,25 @@ export class WeakHashingEncryptionCheck implements SecurityCheck {
         encryptionMethods.forEach(method => {
             issues.push(`Warning: Passwords should not be encrypted using ${method} in method "${methodName}".`);
         });
+<<<<<<< HEAD
     //} else {
        // issues.push(`Info: No encryption-related vulnerabilities found in method "${methodName}".`);
     }
 
     // Detect direct calls to insecure hash libraries in code
     const hashLibraryPattern = /\b#include\s*[<"]?\s*openssl\/(md5|sha)\.h\s*[>"]?/gi;
+=======
+    } else {
+        issues.push(`Info: No encryption-related vulnerabilities found in method "${methodName}".`);
+    } 
+>>>>>>> 0fe8a09af6d4fe1139b256c7aa82a4c09f77a8c0
     
-    if (hashLibraryPattern.test(methodBody)) {
-        // issues.push(
-        //    `Warning: Insecure hash library inclusion detected in method "${methodName}". Avoid using MD5 or SHA-1 from OpenSSL or similar libraries for password hashing.`
-        // ); // put nack
+    // Detect direct calls to insecure hash libraries in code
+    const hashLibraryPattern = /#include\s*[<"]?\s*openssl\/(md5|sha)\.h\s*[>"]?/gi;
+    if ((match = hashLibraryPattern.exec(methodBody)) !== null) {
+        issues.push(
+           `Warning: Insecure hash library inclusion detected in method "${methodName}". Avoid using MD5 or SHA-1 from OpenSSL or similar libraries for password hashing.`
+        ); // put back
     }
 
     return issues;

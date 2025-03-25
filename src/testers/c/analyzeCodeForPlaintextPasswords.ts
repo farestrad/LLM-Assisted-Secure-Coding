@@ -24,25 +24,25 @@ export class PlaintextPasswordCheck implements SecurityCheck{
     ]);
 
     // Phase 1: Password Variable Detection
-    const passwordPattern = new RegExp(`\\b(${passwordKeywords.join('|')})\\b\\s*=\\s*["']?.+["']?`, 'gi');
+    const passwordPattern = new RegExp(`\\b(${passwordKeywords.join('|')})\\b\\s*=\\s*["']?.+?["']?`, 'gi');
     let match;
     
     while ((match = passwordPattern.exec(methodBody)) !== null) {
-        const passwordVar = match[0];
-        passwordVariables.add(match[0]);
+        const passwordVar = match[1];
+        passwordVariables.add(passwordVar);
         issues.push( 'Warning: Potential password variable (' + passwordVar + ') detected in method "' + methodName + '". Ensure it is not stored in plaintext.');
     }
 
     // Phase 2: File Write Operation Detection
     const fileWritePattern = /\b(fwrite|fprintf|write|ofstream|fputs)\s*\(\s*[^,]+/g;
     while ((match = fileWritePattern.exec(methodBody)) !== null) {
-        fileWriteOperations.add(match[0]);
+        fileWriteOperations.add(match[1]);
         issues.push('Warning: File write operation detected in method "' + methodName + '". Ensure sensitive data is encrypted before storage.');
     }
 
     // Phase 3: Risky Password Checks
     const riskyPasswordChecks = [{
-        pattern: /\b(printf|sprintf|fprintf|fwrite|fputs)\s*\(\s*(\w+)\s*,/g,
+        pattern: /\b(printf|sprintf|fprintf|fwrite|fputs)\s*\(\s*([\w\d_]+)\s*[,)]/g,
         handler: (fn: string, buffer: string) => {
             if (passwordVariables.has(buffer)) {
                 return `Potential plaintext password passed to ${fn}`;
@@ -51,7 +51,7 @@ export class PlaintextPasswordCheck implements SecurityCheck{
         }
     },
     {
-        pattern: /\b(log|console\.log|System\.out\.println)\s*\(\s*([^]+)\s*\)/g,
+        pattern: /\b(log|console\.log|System\.out\.println)\s*\(\s*([\w\d_]+)\s*[,)]/g,
         handler: (fn: string, arg: string) => {
             if (passwordVariables.has(arg)) {
                 return `Potential plaintext password logged by ${fn}`;
@@ -67,9 +67,9 @@ export class PlaintextPasswordCheck implements SecurityCheck{
         }
     });
 
-    function isPasswordVariable(variable: string): boolean {
-        return Array.from(passwordVariables).some((passwordVar) => new RegExp(`\\b${passwordVar}\\b`).test(variable));
-    }
+    // function isPasswordVariable(variable: string): boolean {
+    //     return Array.from(passwordVariables).some((passwordVar) => new RegExp(`\\b${passwordVar}\\b`).test(variable));
+    // }
     // Look for password-related variables
     while ((match = passwordPattern.exec(methodBody)) !== null) {
         const passwordVar = match[0];

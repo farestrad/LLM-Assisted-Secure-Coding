@@ -1,8 +1,15 @@
 import * as vscode from 'vscode';
 import { runCTests } from './testers/cTester';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
+<<<<<<< HEAD
 import { CCodeParser } from "./parsers/cCodeParser";
 const TOP_CWES = [
+=======
+import { securityCheckToCVE } from './testers/cTester';
+
+// Export the TOP_CWES constant
+export const TOP_CWES = [
+>>>>>>> 0fe8a09af6d4fe1139b256c7aa82a4c09f77a8c0
         {
             id: 79,
             name: "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
@@ -131,13 +138,86 @@ const TOP_CWES = [
     
 ] as const;
 
-// This class is for the Security Analysis panel with collapsible sections
+type CVEMappingType = {
+    [key: string]: { id: string; description: string }[];
+};
+
+export const CVE_MAPPING: CVEMappingType = {
+    'BufferOverflowCheck': [
+        {
+            id: "CVE-2021-1234",
+            description: "Buffer overflow in XYZ application allows remote attackers to execute arbitrary code.",
+        },
+    ],
+    'HeapOverflowCheck': [
+        {
+            id: "CVE-2021-5678",
+            description: "Heap overflow in ABC library allows attackers to crash the application.",
+        },
+    ],
+    'PlaintextPasswordCheck': [
+        {
+            id: "CVE-2021-9101",
+            description: "Storing passwords in plaintext in XYZ application leads to unauthorized access.",
+        },
+    ],
+    'RaceConditionCheck': [
+        {
+            id: "CVE-2021-1122",
+            description: "Race condition in ABC service allows attackers to bypass security checks.",
+        },
+    ],
+    'OtherVulnerabilitiesCheck': [
+        {
+            id: "CVE-2021-3344",
+            description: "Generic vulnerability in XYZ application allows various attacks.",
+        },
+    ],
+    'RandomNumberGenerationCheck': [
+        {
+            id: "CVE-2021-5566",
+            description: "Weak random number generation in ABC library leads to predictable values.",
+        },
+    ],
+    'WeakHashingEncryptionCheck': [
+        {
+            id: "CVE-2021-7788",
+            description: "Weak hashing algorithm used in XYZ application allows for hash collisions.",
+        },
+    ],
+    'InfiniteLoopCheck': [
+        {
+            id: "CVE-2021-9900",
+            description: "Infinite loop in ABC service leads to denial of service.",
+        },
+    ],
+    'IntegerFlowCheck': [
+        {
+            id: "CVE-2021-1235",
+            description: "Integer overflow in XYZ application allows for buffer overflow.",
+        },
+    ],
+    'PathTraversalCheck': [
+        {
+            id: "CVE-2021-6789",
+            description: "Path traversal vulnerability in ABC application allows unauthorized file access.",
+        },
+    ],
+} as const;
+
 export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<vscode.TreeItem | undefined | void> = new vscode.EventEmitter<vscode.TreeItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<vscode.TreeItem | undefined | void> = this._onDidChangeTreeData.event;
     
+    // Event emitter for security issues updates
+    private _onSecurityIssuesUpdated: vscode.EventEmitter<string[]> = new vscode.EventEmitter<string[]>();
+    readonly onSecurityIssuesUpdated: vscode.Event<string[]> = this._onSecurityIssuesUpdated.event;
+    
     private securityIssues: vscode.TreeItem[] = [];
     private matchedCWEs: vscode.TreeItem[] = [];
+    private rawIssuesText: string[] = []; // Store raw issue text for sharing
+    private isAnalyzing: boolean = false;
+    private cveItems: vscode.TreeItem[] = [];
 
     constructor(private generatedCodeProvider: GeneratedCodeProvider) {}
 
@@ -148,7 +228,11 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
     clear(): void {
         this.securityIssues = [];
         this.matchedCWEs = [];
+        this.rawIssuesText = [];
         this.refresh();
+        
+        // Fire the event with empty issues to clear the right panel
+        this._onSecurityIssuesUpdated.fire([]);
     }
 
     // Helper function to find matching CWEs based on issue description
@@ -167,8 +251,10 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         });
     }
 
-
     updateSecurityAnalysis(issues: string[]): void {
+        // Store raw issues for sharing with the right panel
+        this.rawIssuesText = [...issues];
+        
         this.securityIssues = issues.map(issue => {
             const item = new vscode.TreeItem(issue);
             item.iconPath = new vscode.ThemeIcon("warning");
@@ -200,7 +286,40 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
             return item;
         });
 
+        // New logic to update CVE assignments based on identified issues
+        const cveDetails: { id: string; description: string }[] = [];
+        issues.forEach(issue => {
+            const checkName = issue.split(' (')[0]; // Extract check name
+            if (checkName in securityCheckToCVE) {
+                const cveIds = securityCheckToCVE[checkName]; // Fetch CVE IDs
+                cveIds.forEach(cveId => {
+                    const cveDetail = CVE_MAPPING[cveId]; // Fetch CVE details
+                    if (cveDetail) {
+                        cveDetails.push(...cveDetail);
+                    }
+                });
+            }
+        });
+
+        // Update CVE assignments based on found CVEs
+        this.updateCveAssignments(cveDetails);
+
         this.refresh();
+        
+        // Set analyzing state to false now that we have results
+        this.isAnalyzing = false;
+        
+        // Fire the event with the updated issues
+        this._onSecurityIssuesUpdated.fire(this.rawIssuesText);
+    }
+
+    // New method to update CVE assignments
+    private updateCveAssignments(cveDetails: { id: string; description: string }[]): void {
+        this.cveItems = cveDetails.map(cve => {
+            const item = new vscode.TreeItem(`${cve.id}: ${cve.description}`, vscode.TreeItemCollapsibleState.None);
+            item.tooltip = `CVE ID: ${cve.id}\nDescription: ${cve.description}`;
+            return item;
+        });
     }
 
     // Method to run security analysis on the latest generated code
@@ -208,7 +327,9 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         const code = this.generatedCodeProvider.getLatestGeneratedCode();
     
         if (code) {
+            this.isAnalyzing = true;
             this.clear(); // Clear previous analysis results
+<<<<<<< HEAD
     
             // NEW STEP: Extract functions before running tests
             const extractedFunctions = CCodeParser.extractFunctions(code);
@@ -219,25 +340,66 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
             }
     
             runCTests(extractedFunctions, this); // Pass structured function data
+=======
+            
+            // Notify that analysis is in progress
+            this._onSecurityIssuesUpdated.fire(["Analyzing code for security issues..."]);
+            
+            // Run the C tests and update security issues
+            runCTests(code, this);
+>>>>>>> 0fe8a09af6d4fe1139b256c7aa82a4c09f77a8c0
         } else {
             vscode.window.showWarningMessage("No code generated to analyze.");
+            // Fire event with no issues found
+            this._onSecurityIssuesUpdated.fire(["No code generated to analyze."]);
         }
+    }
+
+    // Method to analyze arbitrary code (not just generated code)
+    async analyzeCode(code: string): Promise<void> {
+        if (code) {
+            this.isAnalyzing = true;
+            this.clear(); // Clear previous analysis results
+            
+            // Notify that analysis is in progress
+            this._onSecurityIssuesUpdated.fire(["Analyzing code for security issues..."]);
+            
+            // Add a small delay to ensure UI is updated before potentially intensive analysis
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Run the C tests and update security issues
+            runCTests(code, this);
+        } else {
+            vscode.window.showWarningMessage("No code provided to analyze.");
+            // Fire event with no issues found
+            this._onSecurityIssuesUpdated.fire(["No code provided to analyze."]);
+        }
+    }
+
+    // Check if analysis is currently running
+    isAnalysisInProgress(): boolean {
+        return this.isAnalyzing;
     }
 
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
         return element;
     }
 
-    getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
+    getChildren(element?: vscode.TreeItem): vscode.ProviderResult<vscode.TreeItem[]> {
         if (!element) {
             return [
-                new vscode.TreeItem('Security Issues', vscode.TreeItemCollapsibleState.Collapsed),
-                new vscode.TreeItem('CWE Details', vscode.TreeItemCollapsibleState.Collapsed),
+                new vscode.TreeItem('Security Issues', vscode.TreeItemCollapsibleState.Expanded),
+                new vscode.TreeItem('CWE Details', vscode.TreeItemCollapsibleState.Expanded),
+                new vscode.TreeItem('CVE Assignments', vscode.TreeItemCollapsibleState.Expanded),
             ];
         }
 
         if (element.label === 'Security Issues') {
-            if (this.securityIssues.length > 0) {
+            if (this.isAnalyzing) {
+                const analyzingItem = new vscode.TreeItem("Analyzing code...");
+                analyzingItem.iconPath = new vscode.ThemeIcon("loading~spin");
+                return [analyzingItem];
+            } else if (this.securityIssues.length > 0) {
                 return this.securityIssues;
             } else {
                 const noIssuesItem = new vscode.TreeItem("No security issues found!");
@@ -247,7 +409,11 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         }
 
         if (element.label === 'CWE Details') {
-            if (this.matchedCWEs.length > 0) {
+            if (this.isAnalyzing) {
+                const analyzingItem = new vscode.TreeItem("Analyzing code...");
+                analyzingItem.iconPath = new vscode.ThemeIcon("loading~spin");
+                return [analyzingItem];
+            } else if (this.matchedCWEs.length > 0) {
                 return this.matchedCWEs;
             } else {
                 const noCweItem = new vscode.TreeItem("No matching CWEs found.");
@@ -256,11 +422,25 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
             }
         }
 
+        if (element.label === 'CVE Assignments') {
+            // Only show CVE assignments if there are found CVEs
+            if (this.cveItems.length > 0) {
+                return this.cveItems;
+            } else {
+                return [new vscode.TreeItem("No CVEs found.")];
+            }
+        }
+
         return [];
     }
 
-    updateCveDetails(cveId: string) {
-        // Do nothing for now
+    // This method returns the raw security issues as strings (for external use)
+    getRawSecurityIssues(): string[] {
+        return this.rawIssuesText;
     }
-    
+
+    updateCveDetails(cveId: string) {
+        // This method is kept for compatibility but currently does nothing
+    }
 }
+
