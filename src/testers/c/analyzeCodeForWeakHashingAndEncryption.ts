@@ -24,8 +24,6 @@ export class WeakHashingEncryptionCheck implements SecurityCheck {
         weakHashes.forEach(hash => {
             issues.push(`Warning: Weak hashing algorithm (${hash}) detected in method "${methodName}".`);
         });
-    } else {
-        issues.push(`Info: No weak hashing algorithms found in method "${methodName}".`);
     } //remove later and match bottom
 
 
@@ -40,8 +38,6 @@ export class WeakHashingEncryptionCheck implements SecurityCheck {
         encryptionMethods.forEach(method => {
             issues.push(`Warning: Passwords should not be encrypted using ${method} in method "${methodName}".`);
         });
-    } else {
-        issues.push(`Info: No encryption-related vulnerabilities found in method "${methodName}".`);
     } 
     
     // Detect direct calls to insecure hash libraries in code
