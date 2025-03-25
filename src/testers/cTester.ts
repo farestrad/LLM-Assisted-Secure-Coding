@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { promisify } from 'util';
-import { cCodeParser } from '../parsers/cCodeParser';
+import { CCodeParser } from '../parsers/cCodeParser';
 import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
 import { SecurityCheck } from "./c/SecurityCheck";
 import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
@@ -81,14 +81,15 @@ type CWE = {
 export async function runCTests(code: string, securityAnalysisProvider: any) {
     try {
         // Step 1: Extract methods from the code
-        const methods = cCodeParser.extractMethods(code);
+        const methods = CCodeParser.extractFunctions(code);
+
 
         // Step 2: Analyze each method for vulnerabilities
         const securityIssues: string[] = [];
         const foundCves: { id: string; description: string }[] = []; // Array to hold found CVEs
 
-        methods.forEach((method) => {
-            const issues = analyzeMethodForSecurityIssues(method);
+        methods.forEach((func) => {
+            const issues = analyzeFunctionForSecurityIssues(func);
             securityIssues.push(...issues);
             
             // Collect CVEs for found issues only if issues are detected
@@ -138,8 +139,16 @@ export async function runCTests(code: string, securityAnalysisProvider: any) {
 /**
  * Analyze a single method for security vulnerabilities.
  **/
-function analyzeMethodForSecurityIssues(method: { name: string; parameters: string[]; body: string }): string[] {
+function analyzeFunctionForSecurityIssues(func: {
+    name: string;
+    returnType: string;
+    parameters: { type: string; name: string }[];
+    lineNumber: number;
+    functionBody: string;
+    functionCalls: string[];
+}): string[] {
     const issues: string[] = [];
+
 
     // Loop through all security checks dynamically
     securityChecks.forEach(check => {
@@ -147,16 +156,17 @@ function analyzeMethodForSecurityIssues(method: { name: string; parameters: stri
         const cweId = securityCheckToCWE[checkName]; // Get the corresponding CWE ID
 
         // Check for vulnerabilities and add the CWE if applicable
-        const foundIssues = check.check(method.body, method.name);
+        const foundIssues = check.check(func.functionBody, func.name);
+
         if (foundIssues.length > 0 && cweId) {
             foundIssues.forEach(issue => {
-                const cwe: CWE | undefined = TOP_CWES.find(cwe => cwe.id === cweId); // Specify the type for cwe
-                issues.push(`${issue} (CWE-${cweId}: ${cwe?.name})`); // Append CWE ID and name to the issue
+                const cwe: CWE | undefined = TOP_CWES.find(cwe => cwe.id === cweId);
+                issues.push(`${issue} (CWE-${cweId}: ${cwe?.name})`);
             });
         } else {
             issues.push(...foundIssues);
         }
-    });
+    });    
 
     return issues;
 }
