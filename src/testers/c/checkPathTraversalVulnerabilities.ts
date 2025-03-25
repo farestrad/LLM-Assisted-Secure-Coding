@@ -1,9 +1,46 @@
 import * as vscode from 'vscode';
+import Parser from 'tree-sitter';
+import C from 'tree-sitter-c';
 import { SecurityCheck } from "../c/SecurityCheck";
 
-/**
- * Check for path traversal vulnerabilities in a method.
- */
+let parser: Parser;
+
+function initParser() {
+    if (!parser) {
+        parser = new Parser();
+        parser.setLanguage(C as unknown as Parser.Language);
+    }
+}
+
+// 🛠️ Escapes special characters for safe regex construction
+function escapeRegex(str: string): string {
+    return str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+// 🔧 Input-specific sanitization checker
+function isSanitized(input: string, methodBody: string): boolean {
+    const sanitizers = [
+        'realpath',
+        'basename',
+        'dirname',
+        'escapeshellarg',
+        'escapeshellcmd',
+        'htmlspecialchars',
+        'htmlentities',
+        'preg_replace'
+    ];
+
+    const sanitized = sanitizers.some(fn => {
+        // Matches: input = fn(...)
+        const pattern = new RegExp(`\\b${input}\\b\\s*=\\s*${fn}\\s*\\(`);
+        return pattern.test(methodBody);
+    });
+
+    console.log(`Checking if "${input}" is sanitized: ${sanitized}`);
+    return sanitized;
+}
+
+
 export class PathTraversalCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
@@ -12,76 +49,88 @@ export class PathTraversalCheck implements SecurityCheck {
         const unsanitizedInputs = new Set<string>();
         let match;
 
-        // 🛠️ Fetch configuration from VSCode (Mocked in tests)
+        // 🔧 Get patterns and escape them for regex use
         const config = vscode.workspace.getConfiguration('securityAnalysis');
-        const pathTraversalPatterns = config.get<string[]>('pathTraversalPatterns', ['../', '~/', '\\..\\']);
+        const rawPatterns = config.get<string[]>('pathTraversalPatterns', ['../', '~/', '\\..\\']);
+        const pathTraversalPatterns = rawPatterns.map(escapeRegex);
+
         const riskyFunctions = config.get<string[]>('riskyFunctions', ['fopen', 'readfile', 'writefile', 'unlink', 'rename']);
         const fileOperations = config.get<string[]>('fileOperations', ['open', 'read', 'write', 'fread', 'fwrite', 'unlink', 'rename']);
 
-        // 🔹 Phase 1: Path Traversal Pattern Detection
-        function escapeRegex(str: string): string {
-            return str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        }
-
-        const escapedPatterns = pathTraversalPatterns.map(escapeRegex);
-        const pathTraversalRegPattern = new RegExp(`\\b(${escapedPatterns.join('|')})`, 'g'); // put back this is never reached
-        const pathTraversalPattern = /(\.\.\/|~\/|\/\.\.|\\\.\.\\)/g;
-
-
+        // 🔹 Phase 1: Regex Path Pattern Matching
+        const pathTraversalPattern = new RegExp(`(${pathTraversalPatterns.join('|')})`, 'g');
         while ((match = pathTraversalPattern.exec(methodBody)) !== null) {
             const path = match[1];
             riskyPaths.add(path);
             issues.push(
-                `Warning: Potential Path Traversal vulnerability detected in method "${methodName}". Avoid using relative paths with user input.`
+                `Warning: Potential Path Traversal pattern "${path}" detected in method "${methodName}". Avoid using relative paths with user input.`
             );
         }
 
-        // 🔹 Phase 2: Risky Function Detection
-        riskyFunctions.forEach((func: string) => {
-            const funcPattern = new RegExp(`\\b${func}\\b\\s*\\(([^)]+)\\)`, 'g');
-            while ((match = funcPattern.exec(methodBody)) !== null) {
-                const argument = match[1].trim();
-                if (!isSanitized(argument, methodBody)) { 
-                    riskyFunctionCalls.add(func);
-                    issues.push(
-                        `Warning: Path traversal vulnerability detected in function "${func}" in method "${methodName}" with argument "${argument}". Avoid using relative paths with user input.`
-                    );
-                }
-            }
-        });
 
-        // 🔹 Phase 3: Unsanitized Input Detection
-        const usagePattern = new RegExp(`\\b(${fileOperations.join('|')})\\s*\\(([^,]+),?`, 'g');
-        while ((match = usagePattern.exec(methodBody)) !== null) {
-            const input = match[2]?.trim();
-            if (input && !isSanitized(input, methodBody)) { 
-                unsanitizedInputs.add(input);
-                issues.push(
-                    `Warning: Unsanitized input "${input}" detected in file operation in method "${methodName}". Ensure input is sanitized before use.`
-                );
+        // 🔹 Phase 2: AST-Based Function Call Analysis
+        initParser();
+        const tree = parser.parse(methodBody);
+
+        function traverse(node: Parser.SyntaxNode) {
+            if (node.type === 'call_expression') {
+                const fnNode = node.child(0);
+                const argNode = node.child(1); // argument list
+                const fnName = fnNode?.text || '';
+                const argsText = argNode?.text || '';
+            
+                // Extract first argument only
+                const rawArgs = argsText.replace(/^\((.*)\)$/, '$1'); // remove outer ()
+                const args = rawArgs.split(',').map(a => a.trim());
+                const firstArg = args[0];
+
+                if ((riskyFunctions.includes(fnName) || fileOperations.includes(fnName)) && firstArg) {
+                    const isTraversal = rawPatterns.some(p => firstArg.includes(p));
+                    const isSafe = isSanitized(firstArg, methodBody);
+                
+                    if (isTraversal && !isSafe) {
+                        riskyFunctionCalls.add(fnName);
+                        issues.push(
+                            `Warning: Path traversal risk — argument "${firstArg}" is passed to sensitive function "${fnName}" in method "${methodName}"`
+                        );
+                    }
+                
+                    if (!isSafe) {
+                        unsanitizedInputs.add(firstArg);
+                        issues.push(
+                           `Warning: Unsanitized file path "${firstArg}" used as argument to "${fnName}" in method "${methodName}". Sanitize or validate before use.`
+                        );
+                    }
+                }
+                
             }
+
+            node.namedChildren.forEach(traverse);
         }
 
-        // 🔹 Phase 4: Context-Aware Execution & File Inclusion Analysis
+        traverse(tree.rootNode);
+
+        // 🔹 Phase 3: Context-aware Regex Checks (exec, include, etc.)
         const contextChecks = [
             {
                 pattern: /\b(exec|system|popen)\s*\(\s*([^)]+)\s*\)/g,
                 handler: (fn: string, arg: string) => {
-                    if (!isSanitized(arg, methodBody) && (arg.includes('../') || arg.includes('"') || arg.includes('`'))) {
-                        return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Avoid using relative paths with user input.`;
+                    if (!isSanitized(arg, methodBody) && rawPatterns.some(p => arg.includes(p))) {
+                        return `Untrusted input "${arg}" passed to command execution function "${fn}" in method "${methodName}". This may enable path traversal or code execution.`;
                     }
-                    return null; // Explicitly return null if no issue is found
+                    return null;
                 }
             },
-        {
-            pattern: /\b(include|require)\s*\(\s*([^)]+)\s*\)/g,
-            handler: (fn: string, arg: string) => {
-                if (!isSanitized(arg, methodBody) && (arg.includes('../') || arg.includes('"') || arg.includes('`'))) {
-                    return `Potential path traversal vulnerability detected in function "${fn}" with argument "${arg}" in method "${methodName}". Avoid using relative paths with user input.`;
+            {
+                pattern: /\b(include|require)\s*\(\s*([^)]+)\s*\)/g,
+                handler: (fn: string, arg: string) => {
+                    if (!isSanitized(arg, methodBody) && rawPatterns.some(p => arg.includes(p))) {
+                        return `Untrusted input "${arg}" passed to "${fn}" in method "${methodName}". This may expose the application to file inclusion or path traversal attacks.`;
+                    }
+                    return null;
                 }
-                return null; // Explicitly return null if no issue is found
             }
-        }];
+        ];
 
         contextChecks.forEach(({ pattern, handler }) => {
             while ((match = pattern.exec(methodBody)) !== null) {
@@ -90,60 +139,6 @@ export class PathTraversalCheck implements SecurityCheck {
             }
         });
 
-        // 🛠️ Helper function to check if input is sanitized
-        function isSanitized(input: string, methodBody: string): boolean {
-            const sanitizationPatterns = [
-                /realpath\s*\(/,
-                /basename\s*\(/,
-                /dirname\s*\(/,
-                /escapeshellarg\s*\(/,
-                /escapeshellcmd\s*\(/,
-                /htmlspecialchars\s*\(/,
-                /htmlentities\s*\(/,
-                /preg_replace\s*\(/
-            ];
-            const sanitized  = sanitizationPatterns.some(pattern => pattern.test(methodBody));
-            console.log(`Checking if "${input}" is sanitized: ${sanitized}`);
-            return sanitized;
-        }
-
         return issues;
     }
 }
-
-
-    // Check for path traversal patterns (e.g., "../") 
-    // const pathTraversalPattern = /\.\.\/|~\/|\\\.\.\\/g;
-    // if (pathTraversalPattern.test(methodBody)) {
-    //     issues.push(
-    //         `Warning: Potential Path Traversal vulnerability detected in method "${methodName}". Avoid using relative paths with user input.`
-    //     );
-    // }
-
-    // Check for risky functions that may lead to path traversal 
-    // const riskyFunctions = ['fopen', 'readfile', 'writefile', 'unlink', 'rename'];
-    // riskyFunctions.forEach((func) => {
-    //     const regex = new RegExp(`\\b${func}\\b\\s*\\(([^)]+)\\)`, 'g');
-    //     while ((match = regex.exec(methodBody)) !== null) {
-    //         const argument = match[1].trim();
-    //         if (argument.includes('../') || argument.includes('"') || argument.includes('`')) {
-    //             issues.push(
-    //                 `Warning: Path traversal vulnerability detected in function "${func}" in method "${methodName}" with argument "${argument}". Avoid using relative paths with user input.`
-    //             );
-    //         }
-    //     }
-    // });
-
-    // Check for unsanitized input usage in file operations 
-    // const usagePattern = /\b(open|read|write|fread|fwrite|unlink|rename)\s*\(([^,]+),?/g;
-    
-    // while ((match = usagePattern.exec(methodBody)) !== null) {
-    //     const input = match[2].trim();
-    //     if (!isSanitized(input, methodBody)) {
-    //         issues.push(
-    //             `Warning: Unsanitized input "${input}" detected in file operation in method "${methodName}". Ensure input is sanitized before use.`
-    //         );
-    //     }
-    // }
-
-   
