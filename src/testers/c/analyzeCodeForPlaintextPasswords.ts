@@ -15,8 +15,7 @@ export class PlaintextPasswordCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         const passwordVariables = new Set<string>();
-        const fileWriteOperations = new Set<string>();
-        let match;
+        
 
         const config = vscode.workspace.getConfiguration('securityAnalysis');
         const passwordKeywords = config.get<string[]>('passwordkeywords', [
