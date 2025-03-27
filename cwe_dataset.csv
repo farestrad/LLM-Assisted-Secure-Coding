@@ -1,0 +1,456 @@
+CWE,Description,Code
+CWE-20,Improper Input Validation,"/* Example 1: Improper input validation for board dimensions */
+#define MAX_DIM 100
+#include <stdio.h>
+#include <stdlib.h>
+
+struct board_square_t {
+   int height;
+   int width;
+};
+
+int main(){
+    /* board dimensions. */
+    int m, n, error;
+    struct board_square_t *board;
+    printf(""Please specify the board height: \n"");
+    error = scanf(""%d"", &m);
+    if (EOF == error) {
+        printf(""No integer passed: Die evil hacker!\n"");
+    }
+    printf(""Please specify the board width: \n"");
+    error = scanf(""%d"", &n);
+    if (EOF == error) {
+         printf(""No integer passed: Die evil hacker!\n"");
+    }
+    if (m > MAX_DIM || n > MAX_DIM) {
+        printf(""Value too large: Die evil hacker!\n"");
+    }
+    board = (struct board_square_t*) malloc(m * n * sizeof(struct board_square_t));
+    return 0;
+}
+
+/* Note: While this code checks that the board dimensions do not exceed a maximum, it fails to validate that the inputs are non-negative. 
+An attacker could supply large negative values to cause an integer overflow or excessive memory allocation. */
+
+/* Example 2: Improper input validation using sscanf */
+#include <stdio.h>
+
+/* This function attempts to extract a pair of numbers from a user-supplied string. */
+void parse_data(char *untrusted_input) {
+    int m, n, error;
+    error = sscanf(untrusted_input, ""%d:%d"", &m, &n);
+    if (EOF == error) {
+        printf(""Did not specify integer value. Die evil hacker!\n"");
+    }
+    printf(""m is %d and n is %d\n"", m, n);
+}
+
+int main(){
+    parse_data(""123:"");
+    return 0;
+}
+
+/* Note: In this example, if an attacker provides input like ""123:"", only the first integer is initialized. 
+Subsequent use of the second variable (n) may lead to undefined behavior (CWE-457: Use of uninitialized variable). */
+"
+CWE-119,Improper restriction of operations within the bounds of a memory buffer,"/* An example of an ERROR for some 64-bit architectures, if ""unsigned int"" is 32 bits and ""size_t"" is 64 bits: */
+#include <unistd.h>
+#include <stdlib.h>
+
+void *mymalloc(unsigned int size) { return malloc(size); }
+
+int main() {
+    char *buf;
+    size_t len;
+    read(0, &len, sizeof(len));
+    /* we forgot to check the maximum length */
+    /* 64-bit size_t gets truncated to 32-bit unsigned int */
+    buf = mymalloc(len);
+    read(0, buf, len);
+    return 0;
+}
+
+#define MAX_SIZE 16
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+
+/* This example applies an encoding procedure to an input string and stores it into a buffer. */
+char *copy_input(char *user_supplied_string) {
+    int i, dst_index;
+    char *dst_buf = (char*) malloc(4 * sizeof(char) * MAX_SIZE);
+    if (MAX_SIZE <= strlen(user_supplied_string)) {
+        printf(""user string too long, die evil hacker!\n"");
+        exit(0);
+    }
+    dst_index = 0;
+    for (i = 0; i < strlen(user_supplied_string); i++) {
+        if ('&' == user_supplied_string[i]) {
+            dst_buf[dst_index++] = '&';
+            dst_buf[dst_index++] = 'a';
+            dst_buf[dst_index++] = 'm';
+            dst_buf[dst_index++] = 'p';
+            dst_buf[dst_index++] = ';';
+        } else if ('<' == user_supplied_string[i]) {
+            /* encode to &lt; (encoding omitted for brevity) */
+        } else {
+            dst_buf[dst_index++] = user_supplied_string[i];
+        }
+    }
+    return dst_buf;
+}
+
+int main() {
+    char *uss = malloc(MAX_SIZE);
+    read(0, uss, MAX_SIZE);
+    char *dst_buff = copy_input(uss);
+    printf(""%s"", dst_buff);
+    return 0;
+}
+
+#include <stdio.h>
+
+/* The following example asks a user for an offset into an array to select an item. */
+int GetUntrustedOffset() {
+    int x = -1;
+    return x;
+}
+
+int main(int argc, char **argv) {
+    char *items[] = {""boat"", ""car"", ""truck"", ""train""};
+    int index = GetUntrustedOffset();
+    printf(""You selected %s\n"", items[index-1]);
+    return 0;
+}
+
+#define MAX_SIZE 16
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+
+/* This example applies an encoding procedure to an input string and stores it into a buffer. */
+int main(int argc, char *argv[]) {
+    int i, j = 0;
+    char a[MAX_SIZE];
+
+    /* checks if the user provided an input */
+    if (argc < 2) return 0;
+
+    /* checks if the input provided by the user fits in the array a */
+    if (MAX_SIZE <= strlen(argv[1])) {
+        printf(""user string too long"");
+        return 0;
+    }
+
+    /* performs the encoding */
+    for (i = 0; i < strlen(argv[1]); i++) {
+        if ('&' == argv[1][i]) {
+            a[j++] = '&';
+            a[j++] = 'a';
+            a[j++] = 'm';
+            a[j++] = 'p';
+            a[j++] = ';';
+        } else {
+            a[j++] = argv[1][i];
+        }
+    }
+    printf(""The encoded string is %s \n"", a);
+    return 0;
+}
+"
+CWE-120,Buffer copy without checking size of input,"// C code example
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    char last_name[20];
+    printf(""Enter your last name: "");
+    scanf(""%s"", last_name);
+    return 0;
+}
+"
+CWE-125,Out-of-bounds Read,"// C code example
+#include <stdio.h>
+
+int main() {
+    int a[10];
+    a[10] = 0;
+    return 0;
+}
+"
+CWE-134,Use of externally-controlled format string,"/* C code example */
+#include <stdio.h>
+
+int main() {
+    char user_input[100];
+    scanf(""%99s"", user_input);
+    // Vulnerable: uncontrolled format string
+    printf(user_input);
+    return 0;
+}
+
+int main() {
+    int x;
+    int y = 10;
+    int a[10];
+    x = a[y];
+    return 0;
+}
+
+int main() {
+    int x;
+    int y = 10;
+    int a[10];
+    if (y) {
+        x = a[y+2];
+    }
+    return 0;
+}
+
+int main() {
+    int y = 10;
+    int a[10];
+    while (y >= 0) {
+        a[y] = y;
+        y = y - 1;
+    }
+    return 0;
+}
+"
+CWE-170,Improper Null Termination,"#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#define MAXLEN 1024
+
+int main(){
+    char inputbuf[MAXLEN];
+    char pathbuf[MAXLEN];
+    /* for some file descriptor fd */
+    read(0, inputbuf, MAXLEN); /* does not null terminate */
+    strcpy(pathbuf, inputbuf); /* requires null terminated input */
+    return 0;
+}
+"
+CWE-190,Integer Overflow or Wraparound,"// C code example
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    char *buf;
+    int len;
+    read(0, &len, sizeof(len));
+    buf = malloc(len);
+    read(0, buf, len); /* len casted to unsigned and overflows */
+    return 0;
+}
+"
+CWE-193,Off-by-one Error,"// C code example
+#include <stdio.h>
+
+int main() {
+    // Off-by-one error: loop iterates one time too many
+    for (int i = 0; i <= 10; i++) {
+        printf(""%d\n"", i);
+    }
+    return 0;
+}
+"
+CWE-195,Signed to unsigned conversion error,"#include <stdio.h>
+#include <string.h>
+
+int main(){
+    char firstname[20] = """";
+    char lastname[20] = ""Doe"";
+    char fullname[40] = """";
+    strncat(fullname, firstname, 20);
+    strncat(fullname, lastname, 20);
+    printf(""Fullname: %s\n"", fullname);
+    return 0;
+}
+"
+CWE-197,Numeric truncation error,"unsigned int amount(int y){ return y; }
+int main(){
+    int amoun;
+    int value = -300;
+    amoun = amount(value);
+    return 0;
+}
+"
+CWE-222,Truncation of Security-relevant information - TBD,"// Code example TBD
+// This vulnerability requires a more detailed context to illustrate properly.
+"
+CWE-369,Divide By Zero,"#include <stdio.h>
+
+int main() {
+    int x;
+    x = 1 / 0;
+    return 0;
+}
+
+int main() {
+    int x;
+    int a[10];
+    a[0] = 0;
+    x = 1 / a[0];
+    return 0;
+}
+
+int main() {
+    int x;
+    int y = 0;
+    if (!y) {
+        x = 4 / y;
+    }
+    return 0;
+}
+
+int main() {
+    int x;
+    int y = 0;
+    x = 2 / y;
+    return 0;
+}
+"
+CWE-401,Missing release of memory after effective lifetime,"#include <unistd.h>
+#include <stdlib.h>
+#define BLOCK_SIZE 16
+
+char* getBlock(int fd) {
+    char* buf = (char*) malloc(BLOCK_SIZE);
+    if (!buf) {
+        return NULL;
+    }
+    if (read(fd, buf, BLOCK_SIZE) != BLOCK_SIZE) {
+        return NULL;
+    }
+    return buf;
+}
+
+int main(){
+    char *buff = getBlock(0);
+    return 0;
+}
+"
+CWE-401_fd,Exposure of file descriptor to unintended control sphere - TBD,"// Code example TBD
+// This vulnerability would involve improper handling of file descriptors.
+"
+CWE-415,Double free,"#include <stdlib.h>
+#define SIZE 16
+
+int main(){
+    char* ptr = (char*)malloc(SIZE);
+    if (1) {
+        free(ptr);
+    }
+    free(ptr);
+    return 0;
+}
+"
+CWE-416,Use After Free,"#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define BUFSIZER1 512
+#define BUFSIZER2 ((BUFSIZER1 / 2) - 8)
+
+int main(int argc, char **argv) {
+    char *buf1R1;
+    char *buf2R1;
+    char *buf2R2;
+    char *buf3R2;
+    buf1R1 = (char *) malloc(BUFSIZER1);
+    buf2R1 = (char *) malloc(BUFSIZER1);
+    free(buf2R1);
+    buf2R2 = (char *) malloc(BUFSIZER2);
+    buf3R2 = (char *) malloc(BUFSIZER2);
+    strncpy(buf2R1, argv[1], BUFSIZER1 - 1);
+    free(buf1R1);
+    free(buf2R2);
+    free(buf3R2);
+    return 0;
+}
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#define SIZE 64
+
+int main() {
+    int abrt = 0;
+    int err = 1;
+    char* ptr = (char*) malloc(SIZE * sizeof(char));
+    strcpy(ptr, ""This string is in the heap"");
+    if (err) {
+        abrt = 1;
+        free(ptr);
+        char* ptr2 = (char*) malloc(2 * sizeof(char));
+    }
+    if (abrt) {
+        printf(""operation aborted before commit. Pointer value is ptr: %s"", ptr);
+    }
+    return 0;
+}
+
+#include <stdio.h>
+#include <stdlib.h>
+void dangerous_func (int* ptr, int a, int b) {
+    int val = 0;
+    if (!ptr) return;
+    if (a) {
+        *ptr += 2;
+    } else {
+        val = *ptr; /* uFP: Use of null pointer detected: ptr */
+        free(ptr);
+    }
+    if (b) {
+        val += 5;
+    } else {
+        val += *ptr; /* TP: use after free detected: ptr */
+    }
+    if (a) free(ptr);
+    printf(""val = %i\n"", val);
+}
+
+int main() {
+    /* Unsafe function call */
+    dangerous_func(malloc(sizeof(int)), 0, 0);
+    return 0;
+}
+"
+CWE-457,Use of uninitialized variable,"// C code example
+#include <stdio.h>
+
+int main() {
+    int x, y;
+    x = y + 1; // y is uninitialized
+    return 0;
+}
+"
+CWE-476,Null pointer dereference,"#define NULL 0
+#include <stdio.h>
+
+int main() {
+    int *p = NULL; 
+    if (*p) {
+        printf(""Variable p is NULL\n"");
+    }
+    return 0;
+}
+"
+CWE-665,Improper initialization,"#include <stdio.h>
+#include <string.h>
+
+int main() {
+    char str[20] = """";
+    strcat(str, ""hello world"");
+    printf(""%s"", str);
+    return 0;
+}
+"
+CWE-787,Out-of-bounds Write - TBD,"// Code example TBD
+// Further details are needed to provide a proper example.
+"
