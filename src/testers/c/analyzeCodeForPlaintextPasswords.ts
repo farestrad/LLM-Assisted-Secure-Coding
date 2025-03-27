@@ -34,22 +34,28 @@ export class PlaintextPasswordCheck implements SecurityCheck {
 
         function traverse(node: Parser.SyntaxNode) {
             // Detect variable assignments (e.g., password = "abc123")
-            if (node.type === 'assignment_expression') {
-                const left = node.child(0);
-                const right = node.child(2);
-
-                if (left && right) {
-                    const variableName = left.text;
-                    const value = right.text;
-
-                    if (passwordKeywords.some(keyword => variableName.toLowerCase().includes(keyword))) {
-                        passwordVariables.add(variableName);
-                        issues.push(
-                            `Warning: Potential password variable (${variableName}) assigned a value in method "${methodName}". Avoid hardcoded passwords.`
-                        );
+            if (node.type === 'declaration') {
+                const initDeclarator = node.namedChildren.find(child => child.type === 'init_declarator');
+            
+                if (initDeclarator) {
+                    const pointerDeclarator = initDeclarator.namedChildren.find(child => child.type.includes('declarator'));
+                    const valueNode = initDeclarator.namedChildren.find(child => child.type.includes('string') || child.type.includes('literal'));
+            
+                    if (pointerDeclarator && valueNode) {
+                        const variableName = pointerDeclarator.text.replace('*', '').trim();
+                        const value = valueNode.text;
+            
+                        if (passwordKeywords.some(keyword => variableName.toLowerCase().includes(keyword))) {
+                            passwordVariables.add(variableName);
+                            issues.push(
+                                `Warning: Potential password variable (${variableName}) assigned a value in method "${methodName}". Avoid hardcoded passwords.`
+                            );
+                        }
                     }
                 }
             }
+            
+            
 
             // Detect risky output/log functions that might expose passwords
             if (node.type === 'call_expression') {
@@ -79,18 +85,6 @@ export class PlaintextPasswordCheck implements SecurityCheck {
         }
 
         traverse(tree.rootNode);
-
-        // 🔹 Optional Fallback Regex-Based File Write Detection
-        const fileWritePattern = /\b(fwrite|fprintf|write|ofstream|fputs)\s*\(/g;
-        while ((match = fileWritePattern.exec(methodBody)) !== null) {
-            const func = match[1];
-            if (!fileWriteOperations.has(func)) {
-                fileWriteOperations.add(func);
-                issues.push(
-                    `Warning: File write operation "${func}" detected in method "${methodName}". Ensure sensitive data is encrypted before writing to file.`
-                );
-            }
-        }
 
         return issues;
     }

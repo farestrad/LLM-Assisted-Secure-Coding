@@ -11,12 +11,12 @@ import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
 import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
-import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
-import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
+//import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
+//import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
 import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
 import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
 import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
-import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
+//import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
 
 // Create an array of all security checks
 const securityChecks: SecurityCheck[] = [
@@ -24,12 +24,12 @@ const securityChecks: SecurityCheck[] = [
     new HeapOverflowCheck(),
     new PlaintextPasswordCheck(),
     new RaceConditionCheck(),
-    new OtherVulnerabilitiesCheck(),
-    new RandomNumberGenerationCheck(),
+    //new OtherVulnerabilitiesCheck(),
+    //new RandomNumberGenerationCheck(),
     new WeakHashingEncryptionCheck(),
     new InfiniteLoopCheck(),
     new IntegerFlowCheck(),
-    new PathTraversalCheck(),
+    //new PathTraversalCheck(),
 ];
 
 const execPromise = promisify(require('child_process').exec);
