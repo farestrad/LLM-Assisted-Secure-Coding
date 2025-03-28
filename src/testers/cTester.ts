@@ -10,7 +10,7 @@ import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
 import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 //import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
-import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
+//import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 //import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
 //import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
 //import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
@@ -27,7 +27,7 @@ const securityChecks: SecurityCheck[] = [
     new BufferOverflowCheck(),
     new HeapOverflowCheck(),
     //new PlaintextPasswordCheck(),
-    new RaceConditionCheck(),
+    //new RaceConditionCheck(),
     //new OtherVulnerabilitiesCheck(),
     //new RandomNumberGenerationCheck(),
     //new WeakHashingEncryptionCheck(),
