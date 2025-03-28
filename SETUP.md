@@ -43,9 +43,7 @@ You would need to ensure you copy the ipv4 address from your digital ocean dashb
 - ```mkdir -p /etc/systemd/system/ollama.service.d```
 - ```echo [Service] >>/etc/systemd/system/ollama.service.d/environment.conf```
 - ```echo Environment=OLLAMA_HOST=0.0.0.0:11434 >>/etc/systemd/system/ollama.service.d/environment.conf```
-  run sudo nano /etc/systemd/system/ollama.service
-```echo -e "[Service]\nEnvironment=\"OLLAMA_HOST=0.0.0.0:11434\"" | sudo tee /etc/systemd/system/ollama.service.d/environment.conf```
-and change the service to 
+  run sudo nano /etc/systemd/system/ollama.service and change the service to 
 ```
 [Service]
 Environment="OLLAMA_HOST=0.0.0.0:11434"
@@ -64,7 +62,34 @@ everything should be working.
   "stream": true}'
   ```
 
+## Steps to setup reserve proxy
+```sudo apt update && sudo apt install nginx -y```
+```sudo systemctl status nginx```
+```sudo nano /etc/nginx/sites-available/ollama```
+add in this 
+```
+server {
+    listen 80;
+    server_name your-server-ip;  # Replace with your public IPv4 address
 
+    location /api/generate {
+        proxy_pass http://127.0.0.1:3000/generate;  # Forward to custom API
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:11434;  # Forward other requests to Ollama directly
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+```sudo apt install python3 python3-pip -y```
+```pip3 install flask requests```
+```mkdir ~/shadow-ml-api```
+```cd ~/shadow-ml-api```
+```nano server.py```
 
 # code-llama-integration README
 
