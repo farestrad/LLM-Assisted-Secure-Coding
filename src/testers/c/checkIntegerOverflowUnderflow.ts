@@ -1,57 +1,110 @@
-
-import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { promisify } from 'util';
+import Parser from 'tree-sitter';
+import C from 'tree-sitter-c';
 import { SecurityCheck } from "../c/SecurityCheck";
-//import { cCodeParser } from '../parsers/cCodeParser';
-//import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
-//import { parseCCode } from '../parsers/cParser';
 
+let parser: Parser;
 
-/**
- * Check for integer overflow and underflow vulnerabilities in a method. 
- */
-export class IntegerFlowCheck implements SecurityCheck{
-    check (methodBody: string, methodName: string): string[] {
-    const issues: string[] = [];
-    const overflowPattern = /\b(\w+)\s*=\s*([\d\-]+)\s*([\+\-\*\/])\s*([\d\-]+)/g;
-    const MAX_INT = Number.MAX_SAFE_INTEGER; // 2^53 - 1
-    const MIN_INT = Number.MIN_SAFE_INTEGER; // -(2^53 - 1)
-
-    let match;
-    while ((match = overflowPattern.exec(methodBody)) !== null) {
-        const variable = match[1]; // Captured variable being assigned
-        const leftOperand = parseInt(match[2], 10); // First number
-        const operator = match[3]; // Arithmetic operator
-        const rightOperand = parseInt(match[4], 10); // Second number
-
-        // Perform the arithmetic operation
-        let result;
-        switch (operator) {
-            case '+':
-                result = leftOperand + rightOperand;
-                break;
-            case '-':
-                result = leftOperand - rightOperand;
-                break;
-            case '*':
-                result = leftOperand * rightOperand;
-                break;
-            case '/':
-                result = rightOperand !== 0 ? leftOperand / rightOperand : null;
-                break;
-            default:
-                result = null; // Should never hit this case with current regex
-        }
-
-        // Check for overflow/underflow
-        if (result !== null && (result > MAX_INT || result < MIN_INT)) {
-            issues.push(
-                `Warning: Integer overflow/underflow detected for variable "${variable}" in method "${methodName}". Operation: "${leftOperand} ${operator} ${rightOperand}".`
-            );
-        }
-    }
-
-    return issues;
+function initParser() {
+    if (!parser) {
+        parser = new Parser();
+        parser.setLanguage(C as unknown as Parser.Language);
     }
 }
+
+export class IntegerFlowCheck implements SecurityCheck {
+    check(methodBody: string, methodName: string): string[] {
+        const issues: string[] = [];
+        const MAX_INT = Number.MAX_SAFE_INTEGER;
+        const MIN_INT = Number.MIN_SAFE_INTEGER;
+
+        const symbolTable = new Map<string, number>(); // variable -> constant value
+
+        initParser();
+        const tree = parser.parse(methodBody);
+
+        function resolveIdentifier(name: string): number | null {
+            return symbolTable.has(name) ? symbolTable.get(name)! : null;
+        }
+
+        function evaluate(node: Parser.SyntaxNode): number | null {
+            if (!node) return null;
+
+            switch (node.type) {
+                case 'number_literal':
+                    return parseInt(node.text);
+                case 'identifier':
+                    return resolveIdentifier(node.text);
+                case 'binary_expression': {
+                    const left = evaluate(node.child(0)!);
+                    const operator = node.child(1)?.text;
+                    const right = evaluate(node.child(2)!);
+
+                    if (left === null || right === null || !operator) return null;
+
+                    try {
+                        switch (operator) {
+                            case '+': return left + right;
+                            case '-': return left - right;
+                            case '*': return left * right;
+                            case '/': return right !== 0 ? left / right : null;
+                            default: return null;
+                        }
+                    } catch {
+                        return null;
+                    }
+                }
+                default:
+                    return null;
+            }
+        }
+
+        function traverse(node: Parser.SyntaxNode) {
+            // Handle variable declarations with initializers (e.g., int x = a + b;)
+            if (node.type === 'declaration') {
+                for (const child of node.namedChildren) {
+                    if (child.type === 'init_declarator') {
+                        const idNode = child.childForFieldName('declarator');
+                        const valueNode = child.childForFieldName('value');
+
+                        if (idNode?.type === 'identifier' && valueNode) {
+                            const val = evaluate(valueNode);
+                            if (val !== null) {
+                                symbolTable.set(idNode.text, val);
+                                if (val > MAX_INT || val < MIN_INT) {
+                                    issues.push(
+                                        `Warning: Integer overflow/underflow detected in method "${methodName}" during declaration of "${idNode.text}".`
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Handle assignment expressions (e.g., x = a + b;)
+            if (node.type === 'assignment_expression') {
+                const left = node.child(0);
+                const right = node.child(2);
+
+                if (left?.type === 'identifier' && right) {
+                    const val = evaluate(right);
+                    if (val !== null) {
+                        symbolTable.set(left.text, val);
+                        if (val > MAX_INT || val < MIN_INT) {
+                            issues.push(
+                                `Warning: Integer overflow/underflow detected in method "${methodName}" during assignment to "${left.text}".`
+                            );
+                        }
+                    }
+                }
+            }
+
+            node.namedChildren.forEach(traverse);
+        }
+
+        traverse(tree.rootNode);
+        return issues;
+    }
+}
+
