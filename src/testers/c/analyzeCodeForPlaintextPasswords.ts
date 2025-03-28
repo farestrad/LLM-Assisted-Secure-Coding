@@ -15,7 +15,6 @@ export class PlaintextPasswordCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         const passwordVariables = new Set<string>();
-        
 
         const config = vscode.workspace.getConfiguration('securityAnalysis');
         const passwordKeywords = config.get<string[]>('passwordkeywords', [
@@ -27,24 +26,24 @@ export class PlaintextPasswordCheck implements SecurityCheck {
         const riskyWriteFunctions = ['fprintf', 'fwrite', 'fputs', 'write', 'printf', 'sprintf'];
         const riskyLogFunctions = ['log', 'console.log', 'System.out.println'];
 
-        // 🔹 Phase 1: AST-based Password Variable Detection
         initParser();
         const tree = parser.parse(methodBody);
 
         function traverse(node: Parser.SyntaxNode) {
-            // Detect variable assignments (e.g., password = "abc123")
+            // 🔍 Password variable declaration detection
             if (node.type === 'declaration') {
                 const initDeclarator = node.namedChildren.find(child => child.type === 'init_declarator');
-            
                 if (initDeclarator) {
-                    const pointerDeclarator = initDeclarator.namedChildren.find(child => child.type.includes('declarator'));
-                    const valueNode = initDeclarator.namedChildren.find(child => child.type.includes('string') || child.type.includes('literal'));
-            
-                    if (pointerDeclarator && valueNode) {
-                        const variableName = pointerDeclarator.text.replace('*', '').trim();
-                        const value = valueNode.text;
-            
-                        if (passwordKeywords.some(keyword => variableName.toLowerCase().includes(keyword))) {
+                    const pointerDecl = initDeclarator.namedChildren.find(child => child.type.includes('declarator'));
+                    const valueNode = initDeclarator.namedChildren.find(child =>
+                        /literal/i.test(child.type) || /string/i.test(child.type)
+                    );
+
+                    if (pointerDecl && valueNode) {
+                        const variableName = pointerDecl.text.replace('*', '').trim();
+                        if (passwordKeywords.some(keyword =>
+                            new RegExp(`\\b${keyword}\\b`, 'i').test(variableName))
+                        ) {
                             passwordVariables.add(variableName);
                             issues.push(
                                 `Warning: Potential password variable (${variableName}) assigned a value in method "${methodName}". Avoid hardcoded passwords.`
@@ -53,10 +52,35 @@ export class PlaintextPasswordCheck implements SecurityCheck {
                     }
                 }
             }
+            if (node.type === 'field_declaration') {
+                const fieldNameNode = node.namedChildren.find(c =>
+                    c.type === 'pointer_declarator' || c.type === 'identifier' || c.type.includes('declarator')
+                );
+                 if (fieldNameNode) {
+                    const fieldName = fieldNameNode.text;
+                    if (passwordKeywords.some(keyword =>
+                        new RegExp(`\\b${keyword}\\b`, 'i').test(fieldName))
+                    ) {
+                        passwordVariables.add(fieldName);
+                        issues.push(
+                            `Warning: Struct field "${fieldName}" may contain a password in method "${methodName}". Avoid hardcoding sensitive data.`
+                        );
+                    }
+                }
+            }
             
+            
+            if (node.type === 'field_expression') {
+                const fieldName = node.child(node.namedChildCount - 1)?.text || '';
+                if (passwordVariables.has(fieldName)) {
+                    issues.push(
+                        `Warning: Access to potential password field "${fieldName}" in method "${methodName}". Avoid exposing sensitive data.`
+                    );
+                }
+            }
             
 
-            // Detect risky output/log functions that might expose passwords
+            // 🔍 Logging/output detection
             if (node.type === 'call_expression') {
                 const fnName = node.child(0)?.text || '';
                 const argList = node.child(1);
@@ -84,7 +108,6 @@ export class PlaintextPasswordCheck implements SecurityCheck {
         }
 
         traverse(tree.rootNode);
-
         return issues;
     }
 }

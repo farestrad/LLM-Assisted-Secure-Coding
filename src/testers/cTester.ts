@@ -9,11 +9,11 @@ import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 // Dynamically import all security checks
 import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
 import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
-//import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
+import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 //import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
 //import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
-import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
+//import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
 import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
 import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
 //import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
@@ -26,11 +26,11 @@ import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 const securityChecks: SecurityCheck[] = [
     new BufferOverflowCheck(),
     new HeapOverflowCheck(),
-    //new PlaintextPasswordCheck(),
+    new PlaintextPasswordCheck(),
     new RaceConditionCheck(),
     //new OtherVulnerabilitiesCheck(),
     //new RandomNumberGenerationCheck(),
-    new WeakHashingEncryptionCheck(),
+    //new WeakHashingEncryptionCheck(),
     new InfiniteLoopCheck(),
     new IntegerFlowCheck(),
     //new PathTraversalCheck(),

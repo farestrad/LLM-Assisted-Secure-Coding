@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SecurityCheck } from "../c/SecurityCheck";
-
+// add struct
 export class FileLevelSecurityCheck implements SecurityCheck {
     check(fileContent: string, fileName: string): string[] {
         const issues: string[] = [];
