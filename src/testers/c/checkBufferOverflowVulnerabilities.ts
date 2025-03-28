@@ -1,176 +1,302 @@
-import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { promisify } from 'util';
+import Parser from 'tree-sitter';
+import C from 'tree-sitter-c';
 import { SecurityCheck } from "../c/SecurityCheck";
-//import { cCodeParser } from '../parsers/cCodeParser';
-//import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
-//import { parseCCode } from '../parsers/cParser';
 
+let parser: Parser;
 
-export class BufferOverflowCheck implements SecurityCheck{
+function initParser() {
+    if (!parser) {
+        parser = new Parser();
+        parser.setLanguage(C as unknown as Parser.Language);
+    }
+}
+
+export class BufferOverflowCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
-        const variables = new Map<string, number>(); //tracks buffer size 
-        const validationChecks = new Set<string>(); // track wether ot not buffer was validated before being used
-        const calledFunctions = new Set<string>(); // track function calls
-        const validationFunctions = new Set<string>(); 
+        const buffers = new Map<string, number>();
+        const validationChecks = new Set<string>();
+        const validationFunctions = new Set<string>();
+        const calledFunctions = new Set<string>();
+        const aliases = new Map<string, string>()
+        const mallocAssigned = new Set<string>();
+        const mallocChecked = new Set<string>();
 
-    // Get configuration from VSCode
-    const config = vscode.workspace.getConfiguration('securityAnalysis');
-    const stackThreshold = config.get<number>('stackBufferThreshold', 512);
 
-    // Phase 1: Enhanced Buffer Declaration Tracking
-    const declRegex = /(\b(?:char|int|long|unsigned|signed|[\w_]+)\s+)+\s*(\w+)\s*\[\s*(\d+)\s*\]/g;
-    let match;
-    while ((match = declRegex.exec(methodBody)) !== null) {
-        variables.set(match[2], parseInt(match[3], 10));
-    }
+        const config = vscode.workspace.getConfiguration('securityAnalysis');
+        const stackThreshold = config.get<number>('stackBufferThreshold', 512);
 
-    // Phase 2: Advanced Validation Check Detection
-    //if (strlen(buffer) < sizeof(buffer) ...)
-    const validationRegex = /(?:\b(?:if|while|for)\s*\(|&&|\|\|).*\b(?:strlen|sizeof|_countof)\s*\(\s*(\w+)\s*\).*?(?:\)|;)/g;
-    while ((match = validationRegex.exec(methodBody)) !== null) {
-        validationChecks.add(match[1]);
-    }
+        initParser();
+        const tree = parser.parse(methodBody);
 
-    // Phase 3: Inter-procedural Validation Tracking
-    //identify function that return bool or int (i.e a validating function) ex bool isValid ( const char * input)...
-    const valFuncRegex = /(?:bool|int)\s+(\w+)\s*\(.*\b(const char\s*\*|void\s*\*).*\)/g;
-    while ((match = valFuncRegex.exec(methodBody)) !== null) {
-        validationFunctions.add(match[1]);
-    }
-
-    // Phase 4: Function Call Tracking
-    // detect recursion or unsafe function call
-    const callRegex = /\b(\w+)\s*\(/g;
-    while ((match = callRegex.exec(methodBody)) !== null) {
-        calledFunctions.add(match[1]);
-    }
-
-    // Phase 5: Context-Aware Risky Function Analysis
-    // use the before function to identify whats safe
-    const functionChecks = [
-        {
-            pattern: /\b(strcpy|gets|sprintf)\s*\(\s*(\w+)\s*,/g,
-            handler: (fn: string, buffer: string) => {
-                if (!validationChecks.has(buffer) && !isValidatedByFunction(buffer)) {
-                    return `Unvalidated ${fn} usage with "${buffer}"`;
-                }
-                return null;
+        function extractSizeLiteral(node: Parser.SyntaxNode): number | null {
+            if (!node) return null;
+        
+            if (node.type === 'number_literal') {
+                return parseInt(node.text);
             }
-        },
-        {
-            pattern: /\bmalloc\s*\(\s*(\w+)\s*\)/g,
-            handler: (_: string, sizeVar: string) => {
-                if (!validationChecks.has(sizeVar)) {
-                    return `Untrusted allocation size "${sizeVar}"`;
-                }
-                //return null; put back
-            }
-        },
-        {
-            pattern: /\b(memcpy|memmove)\s*\(\s*(\w+)\s*,\s*\w+,\s*([^)]+)\s*\)/g,
-            handler: (fn: string, destBuffer: string, sizeExpr: string) => {
-                const declaredSize = variables.get(destBuffer);
-                const sizeValue = parseSizeExpression(sizeExpr);
-                
-                if (declaredSize && sizeValue && sizeValue > declaredSize) {
-                    return `${fn} copying ${sizeValue} bytes into "${destBuffer}" (${declaredSize} bytes)`;
-                }
-                return null;
-            }
+        
+            // Handle constant identifier (e.g., BUF_SIZE)
+            if (buffers.has(node.text)) return buffers.get(node.text)!;
+        
+            return null;
         }
-    ];
+        
 
-    functionChecks.forEach(({ pattern, handler }) => {
-        while ((match = pattern.exec(methodBody)) !== null) {
-            const msg = handler(match[1], match[2], match[3]);
-            if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
-        }
-    });
-
-    // Phase 6: Recursive Function that uses buffer Analysis 
-    /*
-    How it works:
-    Checks if the function calls itself.
-    If true, lists all local buffers and warns about recursion risks.
-    */
-    if (calledFunctions.has(methodName)) {
-        const localBuffers = Array.from(variables.keys()).join(', ');
-        if (localBuffers) {
-            issues.push(`Warning: Recursive function "${methodName}" with local buffers (${localBuffers})`);
-        }
-    }
-
-    // Phase 7: Stack Allocation Analysis
-    /*
-    Why?
-    Allocating large buffers on the stack can cause stack overflow vulnerabilities.
-    */
-    const largeBufferPattern = /\b(char|int|long)\s+(\w+)\s*\[\s*(\d+)\s*\]/g;
-    while ((match = largeBufferPattern.exec(methodBody)) !== null) {
-        const bufferSize = parseInt(match[3], 10);
-        if (bufferSize > stackThreshold) {
-            issues.push(`Warning: Large stack buffer "${match[2]}" (${bufferSize} bytes) in "${methodName}"`);
-        }
-    }
-
-    // Phase 8: Pointer Arithmetic Checks
-    const pointerRegex = /\b(\w+)\s*(\+|\-)=\s*\d+/g;
-    while ((match = pointerRegex.exec(methodBody)) !== null) {
-        if (variables.has(match[1])) {
-            issues.push(`Warning: Pointer arithmetic on buffer "${match[1]}" in "${methodName}"`);
-        }
-    }
-
-    // Phase 9: Array Index Validation
-    const indexRegex = /\b(\w+)\s*\[\s*(\w+)\s*\]/g;
-    while ((match = indexRegex.exec(methodBody)) !== null) {
-        const [buffer, index] = [match[1], match[2]];
-        if (!validationChecks.has(index)) {
-            issues.push(`Warning: Unvalidated index "${index}" used with "${buffer}" in "${methodName}"`);
-        }
-    }
-
-    // Phase 10: Memory Allocation Checks
-    const allocationFunctions = ['malloc', 'calloc', 'realloc'];
-    allocationFunctions.forEach((func) => {
-        const allocationRegex = new RegExp(`\\b${func}\\s*\\(`, 'g');
-        const checkedRegex = new RegExp(`if\\s*\\(\\s*${func}\\s*\\(`);
-
-        while ((match = allocationRegex.exec(methodBody)) !== null) {
-            if (!checkedRegex.test(methodBody)) {
-                issues.push(`Warning: Unchecked return value of "${func}" in "${methodName}"`);
-            }
-        }
-    });
-
-    // Helper Functions
-    function parseSizeExpression(expr: string): number | null {
-        // Handle sizeof() expressions
-        const sizeofMatch = expr.match(/sizeof\s*\(\s*(.+?)\s*\)/);
-
-        //if (sizeofMatch) return variables.get(sizeofMatch[1]) || null; put back
-
-        // Handle arithmetic expressions
-        if (expr.includes('+') || expr.includes('*')) {
+        function evaluateSimpleExpression(expr: string): number | null {
             try {
-                return eval(expr.replace(/\b(\w+)\b/g, (_, v) => variables.get(v)?.toString() || '0'));
+                return eval(expr.replace(/\b(\w+)\b/g, (_, v) => buffers.get(v)?.toString() || "0"));
             } catch {
-               // return null; put back
+                return null;
             }
         }
 
-        // Handle numeric literals and variables
-        return parseInt(expr, 10) || variables.get(expr) || null;
-    }
+        function isValidatedByFunction(buffer: string): boolean {
+            return Array.from(validationFunctions).some(fn =>
+                new RegExp(`\\b${fn}\\s*\\(\\s*${buffer}\\s*\\)`).test(methodBody)
+            );
+        }
 
-    function isValidatedByFunction(buffer: string): boolean {
-        return Array.from(validationFunctions).some(fn => 
-            new RegExp(`\\b${fn}\\s*\\(\\s*${buffer}\\s*\\)`).test(methodBody)
-        );
-    }
-
-    return issues;
+        function traverse(node: Parser.SyntaxNode) {
+            //  Buffer Declarations
+            // Add in declaration detection:
+            if (node.type === 'init_declarator') {
+                const lhs = node.childForFieldName('declarator')?.text.replace(/^\*/, '');
+                const rhs = node.childForFieldName('value')?.text;
+            
+                if (lhs && rhs && buffers.has(rhs)) {
+                    aliases.set(lhs, rhs);
+                    console.log(`✅ Alias detected: ${lhs} → ${rhs}`);
+                }
+            }
+            
+            if (node.type === 'declaration') {
+                const declarator = node.childForFieldName('declarator');
+                if (declarator?.type === 'array_declarator') {
+                    const name = declarator.childForFieldName('declarator')?.text;
+                    const sizeNode = declarator.childForFieldName('size');
+                    let size: number | null = null;
+                    if (sizeNode) {
+                        size = extractSizeLiteral(sizeNode);
 }
+
+                    if (name && size !== null) {
+                        buffers.set(name, size);
+                        if (size > stackThreshold) {
+                            issues.push(`Warning: Large stack buffer "${name}" (${size} bytes) in "${methodName}"`);
+                        }
+                    }
+                }
+            }
+
+            //  Validation Function Identification
+            if (node.type === 'function_definition') {
+                const returnType = node.childForFieldName('type')?.text || '';
+                const parameters = node.childForFieldName('declarator')?.descendantsOfType('parameter_declaration');
+                if (['bool', 'int'].includes(returnType) && parameters?.some(p => /char\s*\*/.test(p.text))) {
+                    const name = node.childForFieldName('declarator')?.descendantsOfType('identifier')[0]?.text;
+                    if (name) validationFunctions.add(name);
+                }
+            }
+
+            // Track variables assigned from malloc
+            if (node.type === 'assignment_expression') {
+                const lhs = node.child(0)?.text;
+                const rhs = node.child(2);
+                if (lhs && rhs?.type === 'call_expression' && rhs.child(0)?.text === 'malloc') {
+                    mallocAssigned.add(lhs);
+                }
+            }
+
+            // Track variables checked with: if (ptr)
+            if (node.type === 'if_statement') {
+                const cond = node.childForFieldName('condition');
+                if (cond?.type === 'identifier') {
+                    mallocChecked.add(cond.text);
+                }
+            }
+
+
+            //  Call Expression Handling
+            if (node.type === 'call_expression') {
+                const fnName = node.child(0)?.text;
+                const args = node.child(1)?.namedChildren.map(c => c.text) || [];
+
+                // Validation tracking
+                if (['strlen', 'sizeof', '_countof'].includes(fnName || '')) {
+                    args.forEach(arg => validationChecks.add(arg));
+                }
+
+                // Unvalidated risky function usage + literal overflow check
+                if (['strcpy', 'gets', 'sprintf'].includes(fnName || '')) {
+                    const buffer = args[0];
+                    const source = args[1];
+
+                    if (
+                        buffer &&
+                        !validationChecks.has(buffer) &&
+                        !isValidatedByFunction(buffer) &&
+                        !mallocChecked.has(buffer)
+                    ) {
+                        issues.push(`Warning: Unvalidated ${fnName} usage with "${buffer}" in "${methodName}"`);
+                    }
+                    
+
+                    // Literal overflow detection (e.g., strcpy(buf, "too long literal"))
+                    if (
+                        buffer &&
+                        source &&
+                        buffers.has(buffer) &&
+                        node.child(1)?.namedChildren?.[1]?.type === 'string_literal'
+                    ) {
+                        const literal = node.child(1)?.namedChildren?.[1]?.text || '';
+                        const literalLength = literal.length - 2; // subtract quotes
+                        const declaredSize = buffers.get(buffer);
+                        if (declaredSize !== undefined && literalLength > declaredSize) {
+                            issues.push(
+                                `Warning: String literal of length ${literalLength} copied into buffer "${buffer}" (${declaredSize} bytes) in "${methodName}". May overflow.`
+                            );
+                        }
+                    }
+                }
+
+                // 🎯 Format string with %s + literal injection estimation
+                if (
+                    ['sprintf', 'snprintf'].includes(fnName || '') &&
+                    args.length >= 2
+                ) {
+                    const destBuffer = args[0];
+                    const formatArg = node.child(1)?.namedChildren[1];
+                    const secondArg = node.child(1)?.namedChildren[2];
+
+                    if (
+                        destBuffer &&
+                        formatArg?.type === 'string_literal' &&
+                        secondArg?.type === 'string_literal' &&
+                        buffers.has(destBuffer)
+                    ) {
+                        const format = formatArg.text;
+                        const injected = secondArg.text;
+                        const formatLen = format.length - 2;  // strip quotes
+                        const injectedLen = injected.length - 2;
+
+                        const totalSize = formatLen + injectedLen - 2; // rough guess, minus %s
+
+                        const bufferSize = buffers.get(destBuffer)!;
+                        if (totalSize > bufferSize) {
+                            issues.push(
+                                `Warning: sprintf format string + argument may overflow buffer "${destBuffer}" (${bufferSize} bytes) in method "${methodName}". Estimated size: ${totalSize}`
+                            );
+                        }
+                    }
+                }
+
+
+
+                // Allocation size validation
+                if (['malloc'].includes(fnName || '') && args.length === 1) {
+                    const sizeArg = args[0];
+                    if (!validationChecks.has(sizeArg)) {
+                        issues.push(`Warning: Untrusted allocation size "${sizeArg}" in "${methodName}"`);
+                    }
+                }
+
+                // Allocation return value check
+                if (['malloc', 'calloc', 'realloc'].includes(fnName || '')) {
+                    const assignedVar = node.parent?.type === 'assignment_expression' ? node.parent.child(0)?.text : null;
+                    if (assignedVar && mallocAssigned.has(assignedVar) && !mallocChecked.has(assignedVar)) {
+                        issues.push(`Warning: Unchecked return value of "${fnName}" in "${methodName}"`);
+                    }
+                }
+                
+
+                if (['memcpy', 'memmove'].includes(fnName || '') && args.length >= 3) {
+                    const [destBuffer, , sizeExprText] = args;
+                    const declaredSize = buffers.get(destBuffer);
+                    const sizeLiteralNode = node.child(1)?.namedChildren[2];
+                
+                    let evaluatedSize: number | null = null;
+                
+                    if (sizeLiteralNode?.type === 'number_literal') {
+                        evaluatedSize = parseInt(sizeLiteralNode.text);
+                    } else {
+                        evaluatedSize = evaluateSimpleExpression(sizeExprText);
+                    }
+                
+                    if (declaredSize && evaluatedSize && evaluatedSize > declaredSize) {
+                        issues.push(
+                            `Warning: ${fnName} copying ${evaluatedSize} bytes into "${destBuffer}" (${declaredSize} bytes) in "${methodName}"`
+                        );
+                    }
+                }
+                
+
+                if (fnName) calledFunctions.add(fnName);
+            }
+
+            //  Recursion Detection
+            if (node.type === 'call_expression' && node.child(0)?.text === methodName) {
+                const bufferNames = Array.from(buffers.keys()).join(', ');
+                if (bufferNames) {
+                    issues.push(`Warning: Recursive function "${methodName}" with local buffers (${bufferNames})`);
+                }
+            }
+
+            // Pointer Arithmetic
+            // Detect pointer arithmetic on aliases
+            console.log("Alias map:", aliases);
+
+            if (node.type === 'augmented_assignment_expression') {
+                const lhsNode = node.child(0);
+                if (lhsNode?.type === 'identifier') {
+                    const target = lhsNode.text.replace(/^\*/, '');
+                if (buffers.has(target) || aliases.has(target)) {
+                    const origin = buffers.has(target) ? target : aliases.get(target)!;
+                    issues.push(`Warning: Pointer arithmetic on buffer alias "${target}" (→ ${origin}) in "${methodName}"`);
+                }
+
+                }
+            }
+            
+
+            // Index Validation
+            if (node.type === 'subscript_expression') {
+                const buffer = node.namedChild(0)?.text;
+                const indexNode = node.namedChild(1);
+                const index = indexNode?.text;
+            
+                if (buffer && index) {
+                    const isLiteral = indexNode.type === 'number_literal';
+            
+                    if (!isLiteral && !validationChecks.has(index)) {
+                        issues.push(`Warning: Unvalidated index "${index}" used with "${buffer}" in "${methodName}"`);
+                    }
+            
+                    // Optional: warn if index constant exceeds buffer size
+                    if (isLiteral && buffers.has(buffer)) {
+                        const maxIndex = parseInt(index);
+                        const bufSize = buffers.get(buffer)!;
+                        if (maxIndex >= bufSize) {
+                            issues.push(`Warning: Index "${maxIndex}" exceeds buffer size (${bufSize}) for "${buffer}" in "${methodName}"`);
+                        }
+                    }
+                }
+            }
+            
+
+            node.namedChildren.forEach(traverse);
+        }
+
+        traverse(tree.rootNode);
+
+        // Hybrid Fallback Regex for Complex Conditional Checks
+        const hybridRegex = /(?:\b(?:if|while|for)\s*\(|&&|\|\|).*?\b(?:strlen|sizeof|_countof)\s*\(\s*(\w+)\s*\).*?(?:\)|;)/g;
+        let match: RegExpExecArray | null;
+        while ((match = hybridRegex.exec(methodBody)) !== null) {
+            validationChecks.add(match[1]);
+        }
+
+        return issues;
+    }
 }

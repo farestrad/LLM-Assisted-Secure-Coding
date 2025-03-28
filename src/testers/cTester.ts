@@ -8,7 +8,7 @@ import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 
 // Dynamically import all security checks
 import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
-import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
+//import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 //import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 //import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 //import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
@@ -25,14 +25,14 @@ import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 // Create an array of all security checks
 const securityChecks: SecurityCheck[] = [
     new BufferOverflowCheck(),
-    new HeapOverflowCheck(),
+    //new HeapOverflowCheck(),
     //new PlaintextPasswordCheck(),
     //new RaceConditionCheck(),
     //new OtherVulnerabilitiesCheck(),
     //new RandomNumberGenerationCheck(),
     //new WeakHashingEncryptionCheck(),
     //new InfiniteLoopCheck(),
-    //]new IntegerFlowCheck(),
+    //new IntegerFlowCheck(),
     //new PathTraversalCheck(),
     new FileLevelSecurityCheck()
 ];
@@ -40,10 +40,6 @@ const securityChecks: SecurityCheck[] = [
 const execPromise = promisify(require('child_process').exec);
 const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
 
-// // Define the file path, with a fallback to `/tmp` if no workspace is open
-// const tempFilePath = vscode.workspace.workspaceFolders
-//     ? `${vscode.workspace.workspaceFolders[0].uri.fsPath}/temp_test_code.c`
-//     : `/tmp/temp_test_code.c`;
 
 // Create a mapping of security checks to their corresponding CWEs
 const securityCheckToCWE: { [key: string]: number } = {
