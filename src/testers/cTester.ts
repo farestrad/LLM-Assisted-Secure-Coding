@@ -15,7 +15,7 @@ import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 //import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
 //import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
 //import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
-import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
+//import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
 //import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
 import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 
@@ -32,7 +32,7 @@ const securityChecks: SecurityCheck[] = [
     //new RandomNumberGenerationCheck(),
     //new WeakHashingEncryptionCheck(),
     //new InfiniteLoopCheck(),
-    new IntegerFlowCheck(),
+    //]new IntegerFlowCheck(),
     //new PathTraversalCheck(),
     new FileLevelSecurityCheck()
 ];
