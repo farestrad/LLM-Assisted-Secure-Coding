@@ -12,18 +12,18 @@ function initParser() {
     }
 }
 
-// 🔑 Unique identifier for AST nodes
+//  Unique identifier for AST nodes
 function nodeKey(node: Parser.SyntaxNode): string {
     return `${node.type}-${node.startPosition.row}:${node.startPosition.column}`;
 }
 
-// 🧠 Extract variables from loop condition
+//  Extract variables from loop condition
 function extractVariablesFromCondition(condition: string): string[] {
     const matches = Array.from(condition.matchAll(/\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g));
     return matches.map(m => m[1]);
 }
 
-// 🔍 Find modified variables in loop body
+// Find modified variables in loop body
 function loopModifiesVariables(loopBody: Parser.SyntaxNode | null | undefined, vars: Set<string>): Set<string> {
     const modified = new Set<string>();
     if (!loopBody) return modified;
@@ -38,7 +38,7 @@ function loopModifiesVariables(loopBody: Parser.SyntaxNode | null | undefined, v
         }
 
         // i = ...
-        if (node.type === 'assignment_expression') {
+     if (node.type === 'assignment_expression') {
             const varName = node.child(0)?.text;
             if (varName && vars.has(varName)) {
                 modified.add(varName);
@@ -60,7 +60,7 @@ function loopModifiesVariables(loopBody: Parser.SyntaxNode | null | undefined, v
     return modified;
 }
 
-// 🔁 Extract increment vars from `for` loop header
+//  Extract increment vars from `for` loop header
 function extractForIncrements(node: Parser.SyntaxNode): Set<string> {
     const incVars = new Set<string>();
     const updateNode = node.childForFieldName('update');
@@ -113,13 +113,13 @@ export class InfiniteLoopCheck implements SecurityCheck {
 
                     const loopVars = new Set(extractVariablesFromCondition(conditionText));
             
-                    // ✅ Add for-increment check if for_statement
+                    //  Add for-increment check if for_statement
                     const headerModified =
                         node.type === 'for_statement'
                             ? extractForIncrements(node)
                             : new Set<string>();
             
-                    // ✅ Loop body
+                    //  Loop body
                     const body = node.childForFieldName('body');
                     const bodyModified = loopModifiesVariables(body, loopVars);
             
@@ -163,7 +163,7 @@ export class InfiniteLoopCheck implements SecurityCheck {
             }
             
 
-            // 📦 Detect large memory allocations
+            //  Detect large memory allocations
             if (node.type === 'call_expression') {
                 const fnName = node.child(0)?.text || '';
                 const args = node.child(1)?.text || '';
