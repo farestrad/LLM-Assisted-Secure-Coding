@@ -60,16 +60,46 @@ export class BufferOverflowCheck implements SecurityCheck {
 
         function traverse(node: Parser.SyntaxNode) {
             //  Buffer Declarations
-            // Add in declaration detection:
             if (node.type === 'init_declarator') {
-                const lhs = node.childForFieldName('declarator')?.text.replace(/^\*/, '');
-                const rhs = node.childForFieldName('value')?.text;
+                const declaratorNode = node.childForFieldName('declarator');
+                const valueNode = node.childForFieldName('value');
             
-                if (lhs && rhs && buffers.has(rhs)) {
-                    aliases.set(lhs, rhs);
-                    console.log(`✅ Alias detected: ${lhs} → ${rhs}`);
+                if (declaratorNode && valueNode) {
+                    // Get identifier from pointer_declarator or direct
+                    const identifier = declaratorNode.descendantsOfType('identifier')[0];
+                    const lhsName = identifier?.text || null;
+                    const rhsName = valueNode.text || null;
+            
+                    // 🌟 Track simple alias like: char *a = buf;
+                    if (lhsName && rhsName && buffers.has(rhsName)) {
+                        aliases.set(lhsName, rhsName);
+                        buffers.set(lhsName, buffers.get(rhsName)!);
+                    }
+            
+                    // 🌟 Handle pointer arithmetic like: char *ptr = buf + 4;
+                    if (valueNode.type === 'binary_expression') {
+                        const op = valueNode.child(1)?.text;
+                        const rhsLeft = valueNode.child(0);
+                        const base = rhsLeft?.text;
+            
+                        if (
+                            lhsName &&
+                            base &&
+                            ['+', '-'].includes(op || '') &&
+                            (buffers.has(base) || aliases.has(base) || mallocAssigned.has(base))
+                        ) {
+                            const origin = buffers.has(base) ? base : aliases.get(base) || 'unknown';
+                            issues.push(
+                                `Warning: Pointer "${lhsName}" assigned with arithmetic on "${base}" (→ ${origin}) in "${methodName}"`
+                            );
+                        }
+                    }
                 }
             }
+            
+            
+            
+            
             
             if (node.type === 'declaration') {
                 const declarator = node.childForFieldName('declarator');
@@ -114,10 +144,10 @@ export class BufferOverflowCheck implements SecurityCheck {
                 const cond = node.childForFieldName('condition');
                 if (cond?.type === 'identifier') {
                     mallocChecked.add(cond.text);
+                    validationChecks.add(cond.text); // Treat the checked malloc'd pointer as validated
                 }
             }
-
-
+           
             //  Call Expression Handling
             if (node.type === 'call_expression') {
                 const fnName = node.child(0)?.text;
@@ -247,17 +277,73 @@ export class BufferOverflowCheck implements SecurityCheck {
             // Detect pointer arithmetic on aliases
             console.log("Alias map:", aliases);
 
-            if (node.type === 'augmented_assignment_expression') {
-                const lhsNode = node.child(0);
-                if (lhsNode?.type === 'identifier') {
-                    const target = lhsNode.text.replace(/^\*/, '');
-                if (buffers.has(target) || aliases.has(target)) {
-                    const origin = buffers.has(target) ? target : aliases.get(target)!;
-                    issues.push(`Warning: Pointer arithmetic on buffer alias "${target}" (→ ${origin}) in "${methodName}"`);
-                }
-
+            // Pointer Arithmetic Detection (extended)
+            if (
+                node.type === 'augmented_assignment_expression' &&
+                ['+=', '-='].includes(node.child(1)?.text || '')
+            ) {
+                const lhs = node.child(0);
+                if (lhs?.type === 'identifier') {
+                    const varName = lhs.text;
+                    if (buffers.has(varName) || aliases.has(varName) || mallocAssigned.has(varName)) {
+                        const origin = buffers.get(varName) ? varName : aliases.get(varName) || 'unknown';
+                        issues.push(`Warning: Pointer arithmetic on buffer or pointer "${varName}" (→ ${origin}) in "${methodName}"`);
+                    }
                 }
             }
+
+            // Handle pointer = buffer + offset;
+            if (
+                node.type === 'assignment_expression'
+            ) {
+                const rhsNode = node.child(2);
+                if (
+                    rhsNode &&
+                    rhsNode.type === 'binary_expression'
+                ) {
+                    const operatorNode = rhsNode.child(1);
+                    if (operatorNode && ['+', '-'].includes(operatorNode.text)) {
+                        const lhs = node.child(0);
+                        const rhsLeft = rhsNode.child(0);
+                        const rhsRight = rhsNode.child(2);
+                        if (
+                            lhs?.type === 'identifier' &&
+                            rhsLeft?.type === 'identifier'
+                        ) {
+                            const base = rhsLeft.text;
+                            const target = lhs.text;
+                            if (buffers.has(base) || aliases.has(base) || mallocAssigned.has(base)) {
+                                const origin = buffers.has(base) ? base : aliases.get(base) || 'unknown';
+                                issues.push(`Warning: Pointer "${target}" assigned with arithmetic on "${base}" (→ ${origin}) in "${methodName}"`);
+                            }
+                        }
+                    }
+                }
+            }
+            
+
+            // Handle *(ptr + N) dereference
+            if (
+                node.type === 'unary_expression' &&
+                node.text.startsWith('*(') &&
+                node.namedChildCount === 1 &&
+                node.firstNamedChild?.type === 'binary_expression'
+            ) {
+                const binary = node.firstNamedChild;
+                const left = binary.child(0);
+                const right = binary.child(2);
+                const op = binary.child(1)?.text;
+
+                if (op && ['+', '-'].includes(op) && left?.type === 'identifier') {
+                    const ptr = left.text;
+                    if (buffers.has(ptr) || aliases.has(ptr) || mallocAssigned.has(ptr)) {
+                        const origin = buffers.has(ptr) ? ptr : aliases.get(ptr) || 'unknown';
+                        issues.push(`Warning: Pointer arithmetic dereference on "${ptr}" (→ ${origin}) in "${methodName}"`);
+                    }
+                }
+            }
+
+
             
 
             // Index Validation
