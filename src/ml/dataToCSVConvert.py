@@ -1,5 +1,5 @@
 import csv
-from cwe_examples import cwe_examples  # Import the CWE examples dictionary
+from cwe_examples import cwe_examples  
 
 def export_to_csv(filename="cwe_dataset.csv"):
     # Open the CSV file for writing
