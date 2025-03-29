@@ -98,16 +98,22 @@ export class BufferOverflowCheck implements SecurityCheck {
                 const valueNode = node.childForFieldName('value');
             
                 if (declaratorNode && valueNode) {
-                    // Get identifier from pointer_declarator or direct
                     const identifier = declaratorNode.descendantsOfType('identifier')[0];
                     const lhsName = identifier?.text || null;
                     const rhsName = valueNode.text || null;
             
-                    // 🌟 Track simple alias like: char *a = buf;
-                    if (lhsName && rhsName && buffers.has(rhsName)) {
+                    if (
+                        lhsName &&
+                        rhsName &&
+                        buffers.has(rhsName) &&
+                        !/^\d+$/.test(rhsName) && // ignore numeric literals
+                        !methodBody.includes(`(${rhsName}`) // crude param check: skip if rhs is a parameter
+                    ) {
                         aliases.set(lhsName, rhsName);
                         buffers.set(lhsName, buffers.get(rhsName)!);
                     }
+                    
+            
             
                     // 🌟 Handle pointer arithmetic like: char *ptr = buf + 4;
                     if (valueNode.type === 'binary_expression') {
@@ -203,9 +209,26 @@ export class BufferOverflowCheck implements SecurityCheck {
                     !isValidatedByFunction(buffer) &&
                     !mallocChecked.has(buffer)
                 ) {
-                    issues.push(
-                        `Warning: Possible unsafe usage of "${fnName}" with "${buffer}" in "${methodName}". Destination is not validated.`
-                    );
+                    if (fnName === 'strncpy') {
+                        const dest = args[0];
+                        const sizeArg = args[2];
+                    
+                        const isValidated =
+                            validationChecks.has(sizeArg) || /sizeof|strlen/.test(sizeArg);
+                    
+                        if (!isValidated) {
+                            //issues.push(
+                            //    `Warning: Unvalidated size parameter in strncpy to "${dest}" in "${methodName}"`
+                          //  );
+                        }
+                    
+                        if (!validationChecks.has(dest) && !isValidatedByFunction(dest)) {
+                            //issues.push(
+                                //`Warning: Possible unsafe usage of "${fnName}" with "${dest}" in "${methodName}". Destination is not validated.`
+                            //);
+                        }
+                    }
+                    
 }
 
 
@@ -245,10 +268,15 @@ export class BufferOverflowCheck implements SecurityCheck {
                 // Allocation size validation
                 if (['malloc'].includes(fnName || '') && args.length === 1) {
                     const sizeArg = args[0];
-                    if (!validationChecks.has(sizeArg)) {
-                        issues.push(`Warning: Untrusted allocation size "${sizeArg}" in "${methodName}"`);
+                    const trimmed = sizeArg.trim();
+                    console.log(`[DEBUG] malloc sizeArg="${sizeArg}" trimmed="${trimmed}"`);
+                    console.log(`[DEBUG] validationChecks.has("${trimmed}") =`, validationChecks.has(trimmed));
+                
+                    if (!validationChecks.has(trimmed)) {
+                        issues.push(`Warning: Untrusted allocation size "${trimmed}" in "${methodName}"`);
                     }
                 }
+                
 
                 // Allocation return value check
                 if (['malloc', 'calloc', 'realloc'].includes(fnName || '')) {
@@ -278,6 +306,29 @@ export class BufferOverflowCheck implements SecurityCheck {
                         );
                     }
                 }
+                if (fnName === 'strncpy') {
+                    const dest = args[0];
+                    const sizeArg = args[2];
+                
+                    // Validate size arg
+                    const isValidated = validationChecks.has(sizeArg) || /sizeof|strlen/.test(sizeArg);
+                
+                    if (!isValidated) {
+                        issues.push(`Warning: Unvalidated size parameter in strncpy to "${dest}" in "${methodName}"`);
+                    }
+                
+                    // Check literal overflow if destination is known
+                    if (buffers.has(dest)) {
+                        const bufferSize = buffers.get(dest)!;
+                        const sizeValue = parseInt(sizeArg);
+                        if (!isNaN(sizeValue) && sizeValue > bufferSize) {
+                            issues.push(
+                                `Warning: strncpy copies ${sizeValue} bytes into buffer "${dest}" (${bufferSize} bytes) in "${methodName}". May overflow.`
+                            );
+                        }
+                    }
+                }
+                
                 
 
                 if (fnName) calledFunctions.add(fnName);
@@ -389,10 +440,37 @@ export class BufferOverflowCheck implements SecurityCheck {
             }
             
 
-            node.namedChildren.forEach(traverse);
+            //node.namedChildren.forEach(traverse);
         }
 
+
+        
+         // Fallback: detect numeric validations in conditions like `if (size < 1024)`
+         const numericCheckRegex = /\bif\s*\((.*?)\)/gs; // Use `s` flag to allow multiline
+         let numericMatch: RegExpExecArray | null;
+ 
+         while ((numericMatch = numericCheckRegex.exec(methodBody)) !== null) {
+             const condition = numericMatch[1];
+ 
+             // Heuristics: must include number & comparison operator
+             if (/[<>!=]=?/.test(condition) && /\b\d+\b/.test(condition)) {
+                 const varMatches = condition.match(/\b\w+\b/g);
+                 for (const v of varMatches || []) {
+                     if (!['if', 'while', 'for', 'sizeof', 'strlen'].includes(v)) {
+                         validationChecks.add(v);
+                     }
+                 }
+             }
+         }
+ 
+         console.log("Validation checks:", Array.from(validationChecks));
+ 
         traverse(tree.rootNode);
+
+
+       
+
+        
 
         // Hybrid Fallback Regex for Complex Conditional Checks
         const hybridRegex = /(?:\b(?:if|while|for)\s*\(|&&|\|\|).*?\b(?:strlen|sizeof|_countof)\s*\(\s*(\w+)\s*\).*?(?:\)|;)/g;

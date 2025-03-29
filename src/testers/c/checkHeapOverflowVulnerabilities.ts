@@ -3,7 +3,7 @@ import Parser from 'tree-sitter';
 import C from 'tree-sitter-c';
 import { SecurityCheck } from "../c/SecurityCheck";
 
-
+// [imports remain the same]
 let parser: Parser;
 
 function initParser() {
@@ -28,15 +28,13 @@ export class HeapOverflowCheck implements SecurityCheck {
         function traverse(node: Parser.SyntaxNode) {
             // Track heap allocations
             if (node.type === 'assignment_expression') {
-                const lhsNode = node.child(0);
-                const lhsIdent = lhsNode?.descendantsOfType('identifier')?.[0]?.text;
-                
+                const lhs = node.child(0)?.text;
                 const rhs = node.child(2);
                 const fn = rhs?.child(0)?.text;
                 const args = rhs?.child(1)?.namedChildren;
 
                 if (
-                    lhsIdent && rhs?.type === 'call_expression' &&
+                    lhs && rhs?.type === 'call_expression' &&
                     ['malloc', 'calloc', 'realloc'].includes(fn || '')
                 ) {
                     const sizeExpr =
@@ -44,10 +42,7 @@ export class HeapOverflowCheck implements SecurityCheck {
                             ? `${args[0].text} * ${args[1].text}`
                             : args?.[0]?.text || 'unknown';
 
-                            if (lhsIdent) {
-                                heapAllocations.set(lhsIdent, { sizeExpr, node });
-                            }
-                            
+                    heapAllocations.set(lhs, { sizeExpr, node });
 
                     if (fn === 'realloc' && args?.length === 2) {
                         const ptr = args[0]?.text;
@@ -79,8 +74,7 @@ export class HeapOverflowCheck implements SecurityCheck {
 
             // Free tracking with AST position
             if (node.type === 'call_expression' && node.child(0)?.text === 'free') {
-                const freed = node.child(1)?.descendantsOfType('identifier')?.[0]?.text;
-
+                const freed = node.child(1)?.namedChildren?.[0]?.text;
                 if (freed) {
                     freedPtrs.set(freed, node.startIndex); // track position of `free(ptr)`
                 }
@@ -160,14 +154,6 @@ export class HeapOverflowCheck implements SecurityCheck {
         
 
         findUseAfterFree(tree.rootNode, freedPtrs);
-
-
-        // 🚨 Detect missing frees (memory leaks)
-        for (const varName of heapAllocations.keys()) {
-            if (!freedPtrs.has(varName)) {
-                issues.push(`Warning: Heap-allocated variable "${varName}" in "${methodName}" is never freed (possible memory leak).`);
-            }
-        }
 
 
         // Final allocation checks

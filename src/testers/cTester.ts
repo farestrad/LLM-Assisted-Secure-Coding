@@ -7,8 +7,8 @@ import { SecurityCheck } from "./c/SecurityCheck";
 import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 
 // Dynamically import all security checks
-//import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
-import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
+import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
+//import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 //import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 //import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 //import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
@@ -17,6 +17,7 @@ import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 //import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
 //import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
 //import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
+//import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
 import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 
 
@@ -24,8 +25,9 @@ import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 
 // Create an array of all security checks
 const securityChecks: SecurityCheck[] = [
-    //new BufferOverflowCheck(),
-    new HeapOverflowCheck(),
+    new BufferOverflowCheck(),
+    //new FloatingInMemoryCheck(),
+    //new HeapOverflowCheck(),
     //new PlaintextPasswordCheck(),
     //new RaceConditionCheck(),
     //new OtherVulnerabilitiesCheck(),
