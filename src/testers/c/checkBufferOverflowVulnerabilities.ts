@@ -22,6 +22,24 @@ export class BufferOverflowCheck implements SecurityCheck {
         const aliases = new Map<string, string>()
         const mallocAssigned = new Set<string>();
         const mallocChecked = new Set<string>();
+        const visited = new Set<Parser.SyntaxNode>();
+        const unsafeFunctions = new Map<string, string>([
+            ['strcpy', 'strncpy'],
+            ['strcat', 'strncat'],
+            ['gets', 'fgets'],
+            ['sprintf', 'snprintf'],
+            ['vsprintf', 'vsnprintf'],
+            ['gets_s', 'fgets'],
+            ['scanf', 'fgets with parsing or use "%Ns"'],
+            ['strtok', 'strtok_r'],
+            ['asctime', 'asctime_r'],
+            ['ctime', 'ctime_r'],
+            ['tmpnam', 'mkstemp'],
+            ['tmpfile', 'tmpfile_s'],
+            ['realpath', 'ensure buffer size is validated'],
+        ]);
+        
+
 
 
         const config = vscode.workspace.getConfiguration('securityAnalysis');
@@ -59,6 +77,21 @@ export class BufferOverflowCheck implements SecurityCheck {
         }
 
         function traverse(node: Parser.SyntaxNode) {
+            if (visited.has(node)) return;
+            visited.add(node);
+             // FIRST: Recursively process children
+            node.namedChildren.forEach(traverse);
+
+            // THEN: Analyze current node
+            if (node.type === 'if_statement') {
+                const cond = node.childForFieldName('condition');
+                const ids = cond?.descendantsOfType('identifier') || [];
+                for (const id of ids) {
+                    mallocChecked.add(id.text);
+                    validationChecks.add(id.text);
+                }
+
+            }
             //  Buffer Declarations
             if (node.type === 'init_declarator') {
                 const declaratorNode = node.childForFieldName('declarator');
@@ -138,58 +171,43 @@ export class BufferOverflowCheck implements SecurityCheck {
                     mallocAssigned.add(lhs);
                 }
             }
+        
 
-            // Track variables checked with: if (ptr)
-            if (node.type === 'if_statement') {
-                const cond = node.childForFieldName('condition');
-                if (cond?.type === 'identifier') {
-                    mallocChecked.add(cond.text);
-                    validationChecks.add(cond.text); // Treat the checked malloc'd pointer as validated
-                }
-            }
+        
            
             //  Call Expression Handling
             if (node.type === 'call_expression') {
                 const fnName = node.child(0)?.text;
                 const args = node.child(1)?.namedChildren.map(c => c.text) || [];
 
+                if (fnName && unsafeFunctions.has(fnName)) {
+                    const safer = unsafeFunctions.get(fnName);
+                    issues.push(
+                        `Warning: Use of unsafe function "${fnName}" in "${methodName}". Consider the safer alternative: "${safer}"`
+                    );
+                }
+                
                 // Validation tracking
                 if (['strlen', 'sizeof', '_countof'].includes(fnName || '')) {
                     args.forEach(arg => validationChecks.add(arg));
                 }
 
-                // Unvalidated risky function usage + literal overflow check
-                if (['strcpy', 'gets', 'sprintf'].includes(fnName || '')) {
-                    const buffer = args[0];
-                    const source = args[1];
+                const buffer = args[0]; // first argument is usually the destination buffer
 
-                    if (
-                        buffer &&
-                        !validationChecks.has(buffer) &&
-                        !isValidatedByFunction(buffer) &&
-                        !mallocChecked.has(buffer)
-                    ) {
-                        issues.push(`Warning: Unvalidated ${fnName} usage with "${buffer}" in "${methodName}"`);
-                    }
-                    
+                const shouldValidateSize = ['strncpy', 'strncat', 'snprintf', 'memcpy', 'memmove'].includes(fnName || '');
 
-                    // Literal overflow detection (e.g., strcpy(buf, "too long literal"))
-                    if (
-                        buffer &&
-                        source &&
-                        buffers.has(buffer) &&
-                        node.child(1)?.namedChildren?.[1]?.type === 'string_literal'
-                    ) {
-                        const literal = node.child(1)?.namedChildren?.[1]?.text || '';
-                        const literalLength = literal.length - 2; // subtract quotes
-                        const declaredSize = buffers.get(buffer);
-                        if (declaredSize !== undefined && literalLength > declaredSize) {
-                            issues.push(
-                                `Warning: String literal of length ${literalLength} copied into buffer "${buffer}" (${declaredSize} bytes) in "${methodName}". May overflow.`
-                            );
-                        }
-                    }
-                }
+                if (
+                    shouldValidateSize &&
+                    buffer &&
+                    !validationChecks.has(buffer) &&
+                    !isValidatedByFunction(buffer) &&
+                    !mallocChecked.has(buffer)
+                ) {
+                    issues.push(
+                        `Warning: Possible unsafe usage of "${fnName}" with "${buffer}" in "${methodName}". Destination is not validated.`
+                    );
+}
+
 
                 // 🎯 Format string with %s + literal injection estimation
                 if (

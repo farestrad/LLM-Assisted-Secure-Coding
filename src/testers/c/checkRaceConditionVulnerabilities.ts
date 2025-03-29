@@ -21,7 +21,7 @@ export class RaceConditionCheck implements SecurityCheck {
 
         const config = vscode.workspace.getConfiguration('securityAnalysis');
         const raceConditionKeywords = config.get<string[]>('raceConditionKeywords', [
-            'fopen', 'freopen', 'fwrite', 'fread', 'fclose', 'fprintf', 'fputs', 'fscanf',
+            'fopen', 'freopen', 'fwrite', 'fread', 'fprintf', 'fputs', 'fscanf',
             'open', 'write', 'close'
         ]);
 
