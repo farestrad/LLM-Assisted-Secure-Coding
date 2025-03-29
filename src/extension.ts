@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import fetch from 'node-fetch';
 import { GeneratedCodeProvider } from './generatedCodeProvider';
-import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';  
-import { AISuggestionHistoryProvider, AISuggestion } from './AISuggestionHistoryProvider';  
+import { SecurityAnalysisProvider } from './SecurityAnalysisProvider';
+import { AISuggestionHistoryProvider, AISuggestion } from './AISuggestionHistoryProvider';
 import { VulnerabilityDatabaseProvider } from './VulnerabilityDatabaseProvider';
 import { trackEvent } from './amplitudeTracker';
 import { SafeScriptViewProvider } from './safeScriptViewProvider';
@@ -51,23 +51,6 @@ export function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(copySuggestionCommand);
 
-    // Set up a listener for security analysis updates
-    securityAnalysisProvider.onSecurityIssuesUpdated((issues: string[]) => {
-        // Create or ensure the right panel is shown
-        SafeScriptPanelRight.createOrShow(context, aiSuggestionHistoryProvider);
-        
-        // Convert issues to a formatted string
-        const issuesString = issues.length > 0 
-            ? issues.join("\n") 
-            : "No security issues found.";
-            
-        // Send the issues to the right panel
-        SafeScriptPanelRight.postMessage({
-            command: 'updateIssues',
-            issues: issuesString
-        });
-    });
-
     // ----------------------------
     // Command: Run Security Analysis on entire active file
     // ----------------------------
@@ -86,24 +69,24 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Clear previous analysis results
         securityAnalysisProvider.clear();
-        
+
         // Ensure the right panel is created and visible
         SafeScriptPanelRight.createOrShow(context);
-        
+
         // Initialize with "analyzing" message
         SafeScriptPanelRight.postMessage({
             command: 'updateIssues',
             issues: "Analyzing code for security issues..."
         });
-        
+
         vscode.window.showInformationMessage('Running security analysis...');
-        
-        // Run the analysis (this will trigger the onSecurityIssuesUpdated event)
+
+        // Run the analysis
         await securityAnalysisProvider.analyzeCode(code);
     });
 
     // ----------------------------
-    // NEW Command: Run Security Analysis on Highlighted Code
+    // Command: Run Security Analysis on Highlighted Code
     // ----------------------------
     vscode.commands.registerCommand('extension.analyzeHighlightedCode', async () => {
         const editor = vscode.window.activeTextEditor;
@@ -114,7 +97,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         const selection = editor.selection;
         const highlightedCode = editor.document.getText(selection);
-        
+
         if (!highlightedCode || highlightedCode.trim() === '') {
             vscode.window.showWarningMessage('No code highlighted. Please select code to analyze.');
             return;
@@ -130,31 +113,31 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Clear previous analysis results
         securityAnalysisProvider.clear();
-        
+
         // Ensure the right panel is created and visible
         SafeScriptPanelRight.createOrShow(context);
-        
+
         // Initialize with "analyzing" message
         SafeScriptPanelRight.postMessage({
             command: 'updateIssues',
             issues: "Analyzing highlighted code for security issues..."
         });
-        
+
         vscode.window.showInformationMessage('Running security analysis on highlighted code...');
-        
+
         // Run the analysis on the highlighted code
         await securityAnalysisProvider.analyzeCode(highlightedCode);
     });
 
     // ----------------------------
-    // NEW Command: Analyze Code from Right Panel
+    // Command: Analyze Code from Right Panel
     // ----------------------------
     vscode.commands.registerCommand('extension.analyzeCodeFromRightPanel', async (code: string) => {
         if (!code || code.trim() === '') {
             vscode.window.showWarningMessage('No code provided for analysis.');
             return "No code provided for analysis.";
         }
-        
+
         // Track the event
         trackEvent('right_panel_code_analysis', {
             user_id: vscode.env.machineId,
@@ -164,18 +147,18 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Clear previous analysis results
         securityAnalysisProvider.clear();
-        
+
         // Initialize with "analyzing" message
         SafeScriptPanelRight.postMessage({
             command: 'analysisStatus',
             status: "Analyzing code for security issues..."
         });
-        
+
         // Run the analysis on the provided code
         await securityAnalysisProvider.analyzeCode(code);
-        
-        // Return the raw security issues for the right panel to use
-        return securityAnalysisProvider.getRawSecurityIssues();
+
+        // Return a success message since getRawSecurityIssues is removed
+        return "Security analysis complete. Check results in the panel.";
     });
 
     // ----------------------------
@@ -206,7 +189,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         outputChannel.appendLine('Generating code with AI...');
 
-        try { //url
+        try {
             const response = await fetch('http://34.130.23.243:11434/api/generate', {
                 method: 'POST',
                 headers: {
@@ -229,8 +212,6 @@ export function activate(context: vscode.ExtensionContext) {
             stream.on('data', (chunk) => {
                 try {
                     const jsonChunk = JSON.parse(chunk.toString());
-                    console.log('Received chunk:', jsonChunk);
-
                     if (jsonChunk.response && jsonChunk.response !== "") {
                         const outputText = jsonChunk.response;
                         partialResponse += outputText;
@@ -263,7 +244,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Code copied to clipboard!');
     });
 
-    // Commands for managing AI suggestions
+    // ----------------------------
+    // Command: Accept AI Suggestion
+    // ----------------------------
     vscode.commands.registerCommand('extension.acceptAISuggestion', async (element: AISuggestion) => {
         const suggestions = await aiSuggestionHistoryProvider.getChildren();
         const id = suggestions ? suggestions.indexOf(element) : -1;
@@ -288,7 +271,7 @@ export function activate(context: vscode.ExtensionContext) {
                 editBuilder.replace(selection, element.suggestion);
             }).then(success => {
                 if (!success) {
-                    vscode.window.showInformationMessage('suggestion not changed');
+                    vscode.window.showInformationMessage('Suggestion not inserted');
                 }
             });
 
@@ -314,6 +297,9 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // ----------------------------
+    // Command: Accept Generated Code
+    // ----------------------------
     vscode.commands.registerCommand('extension.acceptGeneratedCode', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
@@ -326,80 +312,11 @@ export function activate(context: vscode.ExtensionContext) {
             editBuilder.replace(selection, generatedCodeProvider.getLatestGeneratedCode());
         }).then(success => {
             if (!success) {
-                vscode.window.showInformationMessage('code not accepted');
+                vscode.window.showInformationMessage('Generated code not accepted');
             }
         });
-    });
-
-    vscode.commands.registerCommand('extension.toggleSuggestionStatus', (element: AISuggestion) => {
-        if (element.status === 'pending' || element.status === 'rejected') {
-            element.status = 'accepted';
-            vscode.window.showInformationMessage(`AI suggestion accepted.`);
-        } else {
-            element.status = 'rejected';
-            vscode.window.showInformationMessage(`AI suggestion rejected.`);
-        }
-        aiSuggestionHistoryProvider.refresh();
-    });
-
-
-    vscode.commands.registerCommand('extension.fetchCveDetails', async () => {
-        const provider = new VulnerabilityDatabaseProvider();
-        const cveId = await vscode.window.showInputBox({
-            prompt: 'Enter the CVE ID to fetch details (e.g., CVE-2023-1234)',
-        });
-
-        if (!cveId) {
-            vscode.window.showWarningMessage('No CVE ID entered. Fetch operation canceled.');
-            return;
-        }
-
-        try {
-            const cveDetails = await provider.fetchCveDetails(cveId);
-
-            // Extract relevant details
-            const title = cveDetails.cveMetadata?.cveId || 'Unknown CVE ID';
-            const state = cveDetails.cveMetadata?.state || 'Unknown state';
-            const description =
-                cveDetails.containers?.cna?.descriptions?.[0]?.value ||
-                'No description available.';
-            const affectedProducts =
-                cveDetails.containers?.cna?.affected
-                    ?.map((affected: { vendor: string; product: string; versions?: { version: string }[] }) => {
-                        return `- Vendor: ${affected.vendor}, Product: ${affected.product}, Versions: ${
-                            affected.versions?.map((v) => v.version).join(', ') || 'Unknown'
-                        }`;
-                    })
-                    .join('\n') || 'No affected products listed.';
-
-                    // Display the formatted details in a message
-                    const formattedDetails = `**CVE Details**\n
-                    **ID**: ${title}
-                    **State**: ${state}
-                    **Description**: ${description}
-                    **Affected Products**:\n${affectedProducts}`;
-
-            vscode.window.showInformationMessage(formattedDetails, { modal: true });
-        } catch (error: any) {
-            // Handle known errors with specific status codes
-            if (error.response?.status === 404) {
-                vscode.window.showWarningMessage(
-                    `CVE ID "${cveId}" is not listed in the database.`
-                );
-            } else if (error.response?.status === 400) {
-                vscode.window.showWarningMessage(
-                    `CVE ID "${cveId}" is invalid. Please check the format.`
-                );
-            } else {
-                // Handle other errors
-                vscode.window.showErrorMessage(
-                    `Failed to fetch CVE details for "${cveId}": ${
-                        error instanceof Error ? error.message : 'Unknown error'
-                    }`
-                );
-            }
-        }
     });
 }
 
+// Deactivate function
 export function deactivate() {}

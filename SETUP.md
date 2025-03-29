@@ -64,9 +64,13 @@ everything should be working.
 
 ## Steps to setup reserve proxy
 ```sudo apt update && sudo apt install nginx -y```
+
 ```sudo systemctl status nginx```
+
 ```sudo nano /etc/nginx/sites-available/ollama```
+
 add in this 
+
 ```
 server {
     listen 80;
@@ -85,10 +89,15 @@ server {
     }
 }
 ```
+
 ```sudo apt install python3 python3-pip -y```
+
 ```pip3 install flask requests```
+
 ```mkdir ~/shadow-ml-api```
+
 ```cd ~/shadow-ml-api```
+
 ```nano server.py```
 
 # code-llama-integration README
