@@ -1,147 +1,174 @@
-import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { promisify } from 'util';
+import Parser from 'tree-sitter';
+import C from 'tree-sitter-c';
 import { SecurityCheck } from "../c/SecurityCheck";
-//import { cCodeParser } from '../parsers/cCodeParser';
-//import { VulnerabilityDatabaseProvider } from '../VulnerabilityDatabaseProvider';
-//import { parseCCode } from '../parsers/cParser';
 
-/**
- * Check for heap overflow vulnerabilities in a method.
- */
-export class HeapOverflowCheck implements SecurityCheck {
-    check(methodBody: string, methodName: string): string[] {
-        const issues: string[] = [];
-        const heapAllocations = new Map<string, { size: string; line: number }>();
-        const validationChecks = new Set<string>();
-        const arithmeticOperations = new Set<string>();
-        const freedVariables = new Set<string>();
-        let lineNumber = 1;
+let parser: Parser;
 
-    // Phase 1: Track Heap Allocations and Reallocations
-    const allocationRegex = /(\w+)\s*=\s*(malloc|calloc|realloc)\s*\(([^)]+)\)/g;
-    let match;
-    while ((match = allocationRegex.exec(methodBody)) !== null) {
-        const [varName, func, args] = [match[1], match[2], match[3]];
-        const sizeExpr = func === 'calloc' ? args.split(',')[1] : args;
-
-        heapAllocations.set(varName, {
-            size: sizeExpr.trim(),
-            line: lineNumber + countNewlines(methodBody.slice(0, match.index))
-        });
-    }
-
-    // Phase 2: Detect Size Validation Patterns
-    const validationRegex = /(?:if|while|assert)\s*\(.*\b(sizeof|strlen|_countof)\(([^)]+)\).*[<>=]/g;
-    while ((match = validationRegex.exec(methodBody)) !== null) {
-        validationChecks.add(match[2].trim());
-    }
-
-    // Phase 3: Analyze Size Calculations
-    const arithmeticRegex = /(\w+)\s*=\s*(\w+)\s*([*+/-])\s*(\w+)/g;
-    while ((match = arithmeticRegex.exec(methodBody)) !== null) {
-        arithmeticOperations.add(match[1]);
-        if (!validationChecks.has(match[2]) || !validationChecks.has(match[4])) {
-            issues.push(`Warning: Unvalidated arithmetic operation (${match[0]}) in "${methodName}"`);
-        }
-    }
-
-    // Phase 4: Analyze Memory Operations (Including Manual Buffer Copying)
-    const memoryOperationChecks = [
-        {
-            pattern: /(memcpy|memmove|strcpy|strncpy|sprintf)\s*\(\s*(\w+)\s*,/g,
-            handler: (fn: string, dest: string) => {
-                const alloc = heapAllocations.get(dest);
-                if (alloc && !isSizeValidated(alloc.size, validationChecks)) {
-                    return `Unvalidated ${fn} to heap-allocated "${dest}"`;
-                }
-                return null;
-            }
-        },
-        {
-            pattern: /realloc\s*\(\s*(\w+)\s*,\s*([^)]+)\s*\)/g,
-            handler: (_: string, ptr: string, newSize: string) => {
-                if (!isSizeValidated(newSize, validationChecks)) {
-                    return `Unvalidated realloc of "${ptr}" with size "${newSize}"`;
-                }
-                return null; // Explicitly return null to indicate no issues
-            }
-        },
-        {
-            pattern: /(\w+)\s*=\s*(\w+)\s*\+\s*(\d+)/g,
-            handler: (varName: string, rhsVar: string, constant: string) => {
-                if (heapAllocations.has(varName) && !validationChecks.has(varName)) {
-                    return `Unsafe pointer arithmetic on heap variable "${varName}"`;
-                }
-                return null;
-            }
-        }
-    ];
-
-    memoryOperationChecks.forEach(({ pattern, handler }) => {
-        while ((match = pattern.exec(methodBody)) !== null) {
-            const msg = handler(match[1], match[2], match[3] || '');
-            if (msg) issues.push(`Warning: ${msg} in "${methodName}"`);
-        }
-    });
-
-    // Detect Manual Copying in Loops (Buffer Overflows)
-    const loopCopyRegex = /\bfor\s*\(\s*[^;]+;\s*[^;]+;\s*[^)]+\s*\)\s*{[^}]*\b\w+\s*\[\s*\w+\s*\]\s*=/gs;
-    while ((match = loopCopyRegex.exec(methodBody)) !== null) {
-        issues.push(`Warning: Possible buffer overflow due to manual copying in loop in "${methodName}".`);
-    }
-
-    // Phase 5: Check Allocation Sizes
-    heapAllocations.forEach((alloc, varName) => {
-        if (!isSizeValidated(alloc.size, validationChecks)) {
-            issues.push(`Warning: Untrusted allocation size for "${varName}" (${alloc.size}) in "${methodName}" at line ${alloc.line}`);
-        }
-
-        if (isPotentialIntegerOverflow(alloc.size, arithmeticOperations)) {
-            issues.push(`Warning: Potential integer overflow in allocation size for "${varName}" (${alloc.size}) in "${methodName}"`);
-        }
-    });
-
-    // Phase 6: Check Allocation Success (Improved)
-    const uncheckedAllocRegex = /(\w+)\s*=\s*(malloc|calloc|realloc)\s*\([^)]+\)/g;
-    while ((match = uncheckedAllocRegex.exec(methodBody)) !== null) {
-        const varName = match[1];
-        const func = match[2];
-
-        // Look for an if-statement that checks if varName is NULL
-        const validationPattern = new RegExp(`if\\s*\\(\\s*!?\\s*${varName}\\s*\\)`, 'g');
-        if (!validationPattern.test(methodBody)) {
-            issues.push(`Warning: Unchecked "${func}" result for "${varName}" in "${methodName}"`);
-        }
-    }
-
-    // Phase 7: Detect Use-After-Free
-    const freeRegex = /\bfree\s*\(\s*(\w+)\s*\)/g;
-    while ((match = freeRegex.exec(methodBody)) !== null) {
-        freedVariables.add(match[1]);
-    }
-
-    return issues;
-
-    // Helper functions
-    function countNewlines(str: string): number {
-        return (str.match(/\n/g) || []).length;
-    }
-
-    function isSizeValidated(sizeExpr: string, validations: Set<string>): boolean {
-        return sizeExpr.split(/\s*[+*/-]\s*/).some(part => 
-            validations.has(part) || 
-            /\d+/.test(part) || 
-            part.startsWith('sizeof')
-        );
-    }
-
-    function isPotentialIntegerOverflow(sizeExpr: string, arithmeticVars: Set<string>): boolean {
-        return sizeExpr.split(/\s*[+*/-]\s*/).some(term => 
-            arithmeticVars.has(term) || 
-            (/\b\w+\b/.test(term) && !validationChecks.has(term))
-        );
+function initParser() {
+    if (!parser) {
+        parser = new Parser();
+        parser.setLanguage(C as unknown as Parser.Language);
     }
 }
 
+export class HeapOverflowCheck implements SecurityCheck {
+    check(methodBody: string, methodName: string): string[] {
+        const issues: string[] = [];
+        const heapAllocations = new Map<string, { sizeExpr: string, node: Parser.SyntaxNode }>();
+        const validationChecks = new Set<string>();
+        const arithmeticVars = new Set<string>();
+        const freedVars = new Set<string>();
+        const mallocChecked = new Set<string>();
+        const reallocTargets = new Map<string, string>(); // var -> sizeExpr
+
+        const config = vscode.workspace.getConfiguration('securityAnalysis');
+        const tree = (() => { initParser(); return parser.parse(methodBody); })();
+
+        function traverse(node: Parser.SyntaxNode) {
+            if (node.type === 'assignment_expression') {
+                const lhs = node.child(0)?.text;
+                const rhs = node.child(2);
+                const fn = rhs?.child(0)?.text;
+                const args = rhs?.child(1)?.namedChildren;
+
+                if (
+                    lhs && rhs?.type === 'call_expression' &&
+                    ['malloc', 'calloc', 'realloc'].includes(fn || '')
+                ) {
+                    const sizeExpr =
+                        fn === 'calloc' && args?.length === 2
+                            ? `${args[0].text} * ${args[1].text}`
+                            : args?.[0]?.text || 'unknown';
+
+                    heapAllocations.set(lhs, { sizeExpr, node });
+
+                    if (fn === 'realloc' && args?.length === 2) {
+                        const ptr = args[0]?.text;
+                        const newSize = args[1]?.text;
+                        if (ptr && newSize) {
+                            reallocTargets.set(ptr, newSize);
+                        }
+                    }
+                }
+            }
+
+            if (node.type === 'if_statement' || node.type === 'while_statement') {
+                const cond = node.childForFieldName('condition');
+                if (cond) {
+                    cond.descendantsOfType('identifier').forEach(id => {
+                        validationChecks.add(id.text);
+                        mallocChecked.add(id.text);
+                    });
+                }
+            }
+
+            if (node.type === 'assignment_expression') {
+                const lhs = node.child(0)?.text;
+                const rhs = node.child(2);
+                if (lhs && rhs?.type === 'binary_expression') {
+                    arithmeticVars.add(lhs);
+                }
+            }
+
+            // Track free() calls
+            if (node.type === 'call_expression' && node.child(0)?.text === 'free') {
+                const freed = node.child(1)?.namedChildren?.[0]?.text;
+                if (freed) {
+                    freedVars.add(freed);
+                }
+            }
+
+            // Memory ops (memcpy etc.)
+            if (node.type === 'call_expression') {
+                const fn = node.child(0)?.text || '';
+                const args = node.child(1)?.namedChildren || [];
+
+                const dest = args[0]?.text;
+                const sizeExpr = args[2]?.text;
+
+                if (
+                    ['memcpy', 'memmove', 'snprintf', 'strncpy'].includes(fn) &&
+                    dest && heapAllocations.has(dest)
+                ) {
+                    const { sizeExpr: allocExpr } = heapAllocations.get(dest)!;
+                    if (!isSizeValidated(allocExpr)) {
+                        issues.push(`Warning: Unvalidated ${fn} to heap-allocated "${dest}" in "${methodName}"`);
+                    }
+
+                    if (isPotentialOverflow(sizeExpr, allocExpr)) {
+                        issues.push(`Warning: Possible overflow in ${fn} into "${dest}" in "${methodName}"`);
+                    }
+                }
+            }
+
+            node.namedChildren.forEach(traverse);
+        }
+
+        traverse(tree.rootNode);
+
+        // Final checks for heap allocations
+        for (const [varName, { sizeExpr }] of heapAllocations.entries()) {
+            if (!isSizeValidated(sizeExpr)) {
+                issues.push(`Warning: Untrusted allocation size for "${varName}" (${sizeExpr}) in "${methodName}"`);
+            }
+
+            if (isPotentialIntegerOverflow(sizeExpr)) {
+                issues.push(`Warning: Potential integer overflow in allocation size for "${varName}" in "${methodName}"`);
+            }
+
+            if (!mallocChecked.has(varName)) {
+                issues.push(`Warning: Unchecked malloc/calloc result for "${varName}" in "${methodName}"`);
+            }
+        }
+
+        // ⚠️ Validate realloc targets
+        for (const [ptr, sizeExpr] of reallocTargets.entries()) {
+            if (!isSizeValidated(sizeExpr)) {
+                issues.push(`Warning: realloc called on "${ptr}" with unvalidated size "${sizeExpr}" in "${methodName}"`);
+            }
+
+            if (isPotentialIntegerOverflow(sizeExpr)) {
+                issues.push(`Warning: realloc called on "${ptr}" with potentially overflowing size in "${methodName}"`);
+            }
+        }
+
+        // ⚠️ Use-after-free detection
+        for (const varName of freedVars) {
+            if (heapAllocations.has(varName)) {
+                issues.push(`Warning: Potential use-after-free of heap variable "${varName}" in "${methodName}"`);
+            }
+        }
+
+        return issues;
+
+        function isSizeValidated(expr: string): boolean {
+            return expr.split(/\b[\+\-\*\/]\b/).some(token =>
+                validationChecks.has(token.trim()) ||
+                /^\d+$/.test(token.trim()) ||
+                token.includes('sizeof')
+            );
+        }
+
+        function isPotentialIntegerOverflow(expr: string): boolean {
+            return expr.split(/\b[\+\-\*\/]\b/).some(token =>
+                arithmeticVars.has(token.trim()) && !validationChecks.has(token.trim())
+            );
+        }
+
+        function isPotentialOverflow(copyExpr: string | undefined, allocExpr: string): boolean {
+            if (!copyExpr) return false;
+            try {
+                const allocVal = evalExpr(allocExpr);
+                const copyVal = evalExpr(copyExpr);
+                return copyVal > allocVal;
+            } catch {
+                return false;
+            }
+        }
+
+        function evalExpr(expr: string): number {
+            return eval(expr.replace(/[^\d\+\-\*\/\(\)]/g, '')); // sanitized
+        }
+    }
 }
