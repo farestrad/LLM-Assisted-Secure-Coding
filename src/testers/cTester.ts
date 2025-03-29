@@ -32,7 +32,7 @@ const securityChecks: SecurityCheck[] = [
     //new RandomNumberGenerationCheck(),
     //new WeakHashingEncryptionCheck(),
     //new InfiniteLoopCheck(),
-    //new IntegerFlowCheck(),
+   // new IntegerFlowCheck(),
     //new PathTraversalCheck(),
     new FileLevelSecurityCheck()
 ];

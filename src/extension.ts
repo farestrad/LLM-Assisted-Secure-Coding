@@ -206,7 +206,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         outputChannel.appendLine('Generating code with AI...');
 
-        try {
+        try { //url
             const response = await fetch('http://34.130.23.243:11434/api/generate', {
                 method: 'POST',
                 headers: {

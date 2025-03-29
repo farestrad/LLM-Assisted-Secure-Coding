@@ -595,7 +595,7 @@ export class SafeScriptPanelRight {
       appendBubble('status', '✨ Generating improved code...');
       
       try {
-        const response = await fetch('http://34.72.188.73:11434/api/generate', {
+        const response = await fetch('http://34.130.23.243:11434/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -608,7 +608,7 @@ export class SafeScriptPanelRight {
  \${currentUserCode}\`, 
             stream: false 
           }),
-          timeout: 30000
+          timeout: 1000
         });
         
         if (!response.ok) { 
@@ -637,7 +637,7 @@ export class SafeScriptPanelRight {
       appendBubble('status', '✏️ Generating C code from prompt...');
       
       try {
-        const response = await fetch('http://34.72.188.73:11434/api/generate', {
+        const response = await fetch('http://34.130.23.243:11434/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -647,7 +647,7 @@ export class SafeScriptPanelRight {
   \${prompt}\`, 
             stream: false 
           }),
-          timeout: 30000
+          timeout: 1000
         });
         
         if (!response.ok) { 
