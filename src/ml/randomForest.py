@@ -6,22 +6,35 @@ from sklearn.metrics import classification_report
 import joblib
 import os
 
-# Load the dataset exported as CSV
-df = pd.read_csv("cwe_dataset.csv")
+# Load datasets
+df1 = pd.read_csv("LLMSecEval-Prompts_dataset.csv")
+df2 = pd.read_csv("cwe_dataset.csv")
 
-# Combine the description and code into a single text feature
-df["text"] = df["Description"] + " " + df["Code"]
+# Ensure the required columns exist in both datasets
+if "Description" in df1.columns and "Code" in df1.columns and "CWE" in df1.columns:
+    df1["text"] = df1["Description"] + " " + df1["Code"]
+    X1 = df1["text"]
+    y1 = df1["CWE"]
+else:
+    raise ValueError("Missing required columns in LLMSecEval-Prompts_dataset.csv")
 
-# Use the CWE identifier as the label 
-X = df["text"]
-y = df["CWE"]
+if "Description" in df2.columns and "Code" in df2.columns and "CWE" in df2.columns:
+    df2["text"] = df2["Description"] + " " + df2["Code"]
+    X2 = df2["text"]
+    y2 = df2["CWE"]
+else:
+    raise ValueError("Missing required columns in cwe_dataset.csv")
 
-# Convert text into numerical features using TF-IDF
+# Combine both datasets
+X = pd.concat([X1, X2], ignore_index=True)
+y = pd.concat([y1, y2], ignore_index=True)
+
+# Convert text into numerical features
 vectorizer = TfidfVectorizer()
 X_tfidf = vectorizer.fit_transform(X)
 
-# Split the dataset into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X_tfidf, y, test_size=0.2, random_state=42)
+# Split the dataset into training (70%) and testing (30%) sets
+X_train, X_test, y_train, y_test = train_test_split(X_tfidf, y, test_size=0.3, random_state=42)
 
 # Create and train the Random Forest model
 rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -37,8 +50,8 @@ joblib.dump(rf_model, "trained_model.pkl")
 joblib.dump(vectorizer, "vectorizer.pkl")
 print("Model saved successfully!")
 
-# Check if file exists
-if os.path.exists("trained_model.pkl"):
+# Check if files exist
+if os.path.exists("/mnt/data/trained_model.pkl"):
     print("trained_model.pkl successfully created!")
 else:
     print("Error: trained_model.pkl NOT created!")
