@@ -6,26 +6,15 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 app = Flask(__name__)
 
-# -----------------------------
-# Load Trained CWE Model and Vectorizer
-# -----------------------------
 print("Loading trained model and vectorizer...")
-model = joblib.load("trained_model.pkl")  # Random Forest model
+model = joblib.load("trained_model.pkl")  
 vectorizer = joblib.load("vectorizer.pkl")
 
-# Load CWE descriptions from CSV
 df = pd.read_csv("cwe_dataset.csv")
 cwe_mapping = dict(zip(df["CWE"], df["Description"]))
 
-# -----------------------------
-# Ollama API Config
-# -----------------------------
 OLLAMA_API = "http://127.0.0.1:11434/api/generate"
 
-
-# -----------------------------
-# Generate and Fine-Tune Code
-# -----------------------------
 @app.route('/generate', methods=['POST'])
 def generate_and_finetune():
     data = request.json
@@ -58,18 +47,10 @@ def generate_and_finetune():
     })
 
 
-# -----------------------------
-# Fine-Tune Generated Code (Shadow Model)
-# -----------------------------
 def fine_tune_output(code):
-    # Example fine-tuning logic
     fine_tuned_code = f"/* Fine-Tuned Code */\n{code}"
     return fine_tuned_code
 
-
-# -----------------------------
-# Predict CWE on Code Snippet
-# -----------------------------
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json
@@ -96,10 +77,6 @@ def predict_cwe(code_snippet):
     except Exception as e:
         return {"error": str(e)}
 
-
-# -----------------------------
-# Main Application Entry Point
-# -----------------------------
 if __name__ == '__main__':
     print("Starting Flask server...")
     app.run(host='0.0.0.0', port=3000)
