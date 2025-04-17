@@ -1,14 +1,28 @@
+# VS Code config and test environments
 .vscode/**
 .vscode-test/**
-out/**
-node_modules/**
+
+# Source files and sourcemaps
 src/**
+**/*.ts
+**/*.map
+
+# Tests and coverage
+out/test/**
+out/__mocks__/**
+coverage/**
+
+# Project config and build tools
 .gitignore
 .yarnrc
+.env
+jest.config.js
 webpack.config.js
+tsconfig*.json
+eslint.config.mjs
 vsc-extension-quickstart.md
-**/tsconfig.json
-**/eslint.config.mjs
-**/*.map
-**/*.ts
-**/.vscode-test.*
+
+# ML models, datasets, and debug assets
+**/*.pkl
+**/*.csv
+ast.json
