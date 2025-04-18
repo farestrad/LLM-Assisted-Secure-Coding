@@ -105,7 +105,7 @@ export function activate(context: vscode.ExtensionContext) {
         const suggestion = aiSuggestionProvider.getSuggestionById(suggestionId);
         if (suggestion) {
             vscode.env.clipboard.writeText(suggestion.suggestion);
-            vscode.window.showInformationMessage('Code copied to clipboard');
+            vscode.window.showInformationMessage('Copied to clipboard');
         }
     });
     

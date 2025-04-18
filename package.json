@@ -2,8 +2,8 @@
   "name": "SafeScript",
   "publisher": "SafeScript",
   "displayName": "SafeScript",
-  "description": "Enhances VS Code with Code Llama for AI-powered code analysis and security vulnerability detection.",
-  "version": "2.0.3",
+  "description": "Enhances VS Code with Code Llama for AI-powered code analysis and with custom security vulnerability detection.",
+  "version": "2.0.4",
   "icon": "assets/SafeScript_logo.png",
   "preview": true,
   "galleryBanner.color": {
@@ -20,13 +20,9 @@
     "onCommand:codeLlama.runCodeLlama",
     "onCommand:extension.runSecurityAnalysis",
     "onCommand:extension.analyzeHighlightedCode",
-    "onCommand:extension.testSecurityAnalysis",
     "onCommand:codeLlama.generateCode",
     "onCommand:extension.acceptAISuggestion",
     "onCommand:extension.rejectAISuggestion",
-    "onCommand:extension.triggerAISuggestion",
-    "onCommand:extension.acceptCodeChanges",
-    "onCommand:extension.toggleAssistantSidebar",
     "onView:safescriptPanel",
     "onCommand:extension.fetchCveDetails",
     "onCommand:extension.safescript.showRightPanel",
@@ -61,32 +57,12 @@
         "title": "Copy Generated Code to Clipboard"
       },
       {
-        "command": "extension.undoAISuggestion",
-        "title": "Undo AI Suggestion"
-      },
-      {
         "command": "extension.acceptAISuggestion",
         "title": "Accept AI Suggestion"
       },
       {
         "command": "extension.rejectAISuggestion",
         "title": "Reject AI Suggestion"
-      },
-      {
-        "command": "extension.triggerAISuggestion",
-        "title": "Trigger AI Suggestion"
-      },
-      {
-        "command": "extension.acceptCodeChanges",
-        "title": "Accept Code Changes"
-      },
-      {
-        "command": "extension.toggleAssistantSidebar",
-        "title": "Toggle Assistant Sidebar"
-      },
-      {
-        "command": "extension.testSecurityAnalysis",
-        "title": "Test Security Analysis Panel"
       },
       {
         "command": "extension.fetchCveDetails",
@@ -99,6 +75,10 @@
       {
         "command": "extension.copySuggestion",
         "title": "Copy Suggestion"
+      },
+      {
+        "command": "extension.analyzeCodeFromRightPanel",
+        "title": "analyzeCodeFromRightPanel"
       }
     ],
     "keybindings": [
@@ -121,11 +101,6 @@
         "command": "extension.analyzeHighlightedCode",
         "key": "ctrl+alt+h",
         "when": "editorTextFocus && editorHasSelection"
-      },
-      {
-        "command": "extension.testSecurityAnalysis",
-        "key": "ctrl+alt+t",
-        "when": "editorTextFocus"
       },
       {
         "command": "codeLlama.generateCode",

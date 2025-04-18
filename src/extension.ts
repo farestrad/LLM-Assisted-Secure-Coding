@@ -241,7 +241,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Copy to clipboard command
     vscode.commands.registerCommand('extension.copyToClipboard', (code: string) => {
         vscode.env.clipboard.writeText(code);
-        vscode.window.showInformationMessage('Code copied to clipboard!');
+        vscode.window.showInformationMessage('Copied to clipboard!');
     });
 
     // ----------------------------
@@ -315,6 +315,64 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage('Generated code not accepted');
             }
         });
+    });
+
+    vscode.commands.registerCommand('extension.fetchCveDetails', async () => {
+        const provider = new VulnerabilityDatabaseProvider();
+        const cveId = await vscode.window.showInputBox({
+            prompt: 'Enter the CVE ID to fetch details (e.g., CVE-2023-1234)',
+        });
+
+        if (!cveId) {
+            vscode.window.showWarningMessage('No CVE ID entered. Fetch operation canceled.');
+            return;
+        }
+
+        try {
+            const cveDetails = await provider.fetchCveDetails(cveId);
+
+            // Extract relevant details
+            const title = cveDetails.cveMetadata?.cveId || 'Unknown CVE ID';
+            const state = cveDetails.cveMetadata?.state || 'Unknown state';
+            const description =
+                cveDetails.containers?.cna?.descriptions?.[0]?.value ||
+                'No description available.';
+            const affectedProducts =
+                cveDetails.containers?.cna?.affected
+                    ?.map((affected: { vendor: string; product: string; versions?: { version: string }[] }) => {
+                        return `- Vendor: ${affected.vendor}, Product: ${affected.product}, Versions: ${
+                            affected.versions?.map((v) => v.version).join(', ') || 'Unknown'
+                        }`;
+                    })
+                    .join('\n') || 'No affected products listed.';
+
+                    // Display the formatted details in a message
+                    const formattedDetails = `**CVE Details**\n
+                    **ID**: ${title}
+                    **State**: ${state}
+                    **Description**: ${description}
+                    **Affected Products**:\n${affectedProducts}`;
+
+            vscode.window.showInformationMessage(formattedDetails, { modal: true });
+        } catch (error: any) {
+            // Handle known errors with specific status codes
+            if (error.response?.status === 404) {
+                vscode.window.showWarningMessage(
+                    `CVE ID "${cveId}" is not listed in the database.`
+                );
+            } else if (error.response?.status === 400) {
+                vscode.window.showWarningMessage(
+                    `CVE ID "${cveId}" is invalid. Please check the format.`
+                );
+            } else {
+                // Handle other errors
+                vscode.window.showErrorMessage(
+                    `Failed to fetch CVE details for "${cveId}": ${
+                        error instanceof Error ? error.message : 'Unknown error'
+                    }`
+                );
+            }
+        }
     });
 }
 
