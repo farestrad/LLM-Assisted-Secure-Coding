@@ -1,20 +1,20 @@
-import amplitude from 'amplitude-js';
-import * as dotenv from 'dotenv';
+// Remove dotenv — no need for it at runtime
+// import * as dotenv from 'dotenv';
+// dotenv.config(); <-- not needed
 
-dotenv.config();
+import * as amplitude from '@amplitude/node';
 
 const AMPLITUDE_API_KEY = process.env.AMPLITUDE_API_KEY || '';
 
 if (!AMPLITUDE_API_KEY) {
-    console.error('Amplitude API Key not found in .env file');
+    console.error('Amplitude API Key not found — make sure it’s injected at build time!');
 }
 
-const amplitudeInstance = amplitude.getInstance();
-amplitudeInstance.init(AMPLITUDE_API_KEY);
+const client = amplitude.init(AMPLITUDE_API_KEY);
 
 export const trackEvent = (eventName: string, properties: any = {}) => {
-    amplitudeInstance.logEvent(eventName, properties);
+    client.logEvent({
+        event_type: eventName,
+        event_properties: properties,
+    });
 };
-
-
-

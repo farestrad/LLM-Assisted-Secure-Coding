@@ -1,51 +1,52 @@
-//@ts-check
+// @ts-check
 
 'use strict';
 
 const path = require('path');
+const webpack = require('webpack'); // Added to inject environment variables
+const dotenv = require('dotenv'); // To load .env file
 
-//@ts-check
+dotenv.config(); // Automatically loads environment variables from .env file
+
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
 /** @type WebpackConfig */
 const extensionConfig = {
-  target: 'node', // VS Code extensions run in a Node.js-context 📖 -> https://webpack.js.org/configuration/node/
-	mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
+  target: 'node',
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development', // Dynamic mode based on environment
 
-  entry: './src/extension.ts', // the entry point of this extension, 📖 -> https://webpack.js.org/configuration/entry-context/
+  entry: './src/extension.ts',
   output: {
-    // the bundle is stored in the 'dist' folder (check package.json), 📖 -> https://webpack.js.org/configuration/output/
     path: path.resolve(__dirname, 'dist'),
     filename: 'extension.js',
-    libraryTarget: 'commonjs2'
+    libraryTarget: 'commonjs2',
   },
   externals: {
-    vscode: 'commonjs vscode', // Exclude VS Code module
-    'tree-sitter': 'commonjs tree-sitter', // 👈 Exclude tree-sitter
-    'tree-sitter-c': 'commonjs tree-sitter-c' // 👈 Exclude tree-sitter-c
-    // Add other modules that cannot be webpack'ed, 📖 -> https://webpack.js.org/configuration/externals/
-    // Modules added here also need to be added in the .vscodeignore file
+    vscode: 'commonjs vscode',
+    'tree-sitter': 'commonjs tree-sitter',
+    'tree-sitter-c': 'commonjs tree-sitter-c',
   },
   resolve: {
-    // Support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
   },
   module: {
     rules: [
       {
         test: /\.ts$/,
         exclude: /node_modules/,
-        use: [
-          {
-            loader: 'ts-loader'
-          }
-        ]
-      }
-    ]
+        use: [{ loader: 'ts-loader' }],
+      },
+    ],
   },
+  plugins: [
+    new webpack.DefinePlugin({
+      // Inject the AMPLITUDE_API_KEY environment variable into the bundle
+      'process.env.AMPLITUDE_API_KEY': JSON.stringify(process.env.AMPLITUDE_API_KEY),
+    }),
+  ],
   devtool: 'nosources-source-map',
   infrastructureLogging: {
-    level: "log", // Enables logging required for problem matchers
+    level: 'log',
   },
 };
 
