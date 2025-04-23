@@ -13,7 +13,7 @@ import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 // import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
 // import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
-// import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
+ import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
  import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
 // import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
 // import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
@@ -29,7 +29,7 @@ const securityChecks: SecurityCheck[] = [
      new RaceConditionCheck(),
     // new OtherVulnerabilitiesCheck(),
     // new RandomNumberGenerationCheck(),
-    // new WeakHashingEncryptionCheck(),
+     new WeakHashingEncryptionCheck(),
      new InfiniteLoopCheck(),
     // new IntegerFlowCheck(),
     // new PathTraversalCheck(),
