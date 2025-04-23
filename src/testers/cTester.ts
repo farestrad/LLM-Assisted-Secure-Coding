@@ -12,10 +12,10 @@ import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 // import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
-// import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
+ import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
  import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
  import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
-// import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
+ import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
 // import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
 // import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
 // import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
@@ -28,10 +28,10 @@ const securityChecks: SecurityCheck[] = [
     new PlaintextPasswordCheck(),
      new RaceConditionCheck(),
     // new OtherVulnerabilitiesCheck(),
-    // new RandomNumberGenerationCheck(),
+     new RandomNumberGenerationCheck(),
      new WeakHashingEncryptionCheck(),
      new InfiniteLoopCheck(),
-    // new IntegerFlowCheck(),
+     new IntegerFlowCheck(),
     // new PathTraversalCheck(),
     // new FileLevelSecurityCheck()
 ];
