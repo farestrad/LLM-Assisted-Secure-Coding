@@ -14,7 +14,7 @@ import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 // import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
 // import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
 // import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
-// import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
+ import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
 // import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
 // import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
 // import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
@@ -30,7 +30,7 @@ const securityChecks: SecurityCheck[] = [
     // new OtherVulnerabilitiesCheck(),
     // new RandomNumberGenerationCheck(),
     // new WeakHashingEncryptionCheck(),
-    // new InfiniteLoopCheck(),
+     new InfiniteLoopCheck(),
     // new IntegerFlowCheck(),
     // new PathTraversalCheck(),
     // new FileLevelSecurityCheck()
