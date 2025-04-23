@@ -7,33 +7,33 @@ import { SecurityCheck } from "./c/SecurityCheck";
 import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 
 // Dynamically import all security checks
-import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
-import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
+// import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
+// import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
-import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
-import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
-import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
-import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
-import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
-import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
-import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
-import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
+// import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
+// import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
+// import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
+// import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
+// import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
+// import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
+// import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
+// import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 
 // Create an array of all security checks
 const securityChecks: SecurityCheck[] = [
-    new BufferOverflowCheck(),
-    new FloatingInMemoryCheck(),
-    new HeapOverflowCheck(),
+    // new BufferOverflowCheck(),
+    // new FloatingInMemoryCheck(),
+    // new HeapOverflowCheck(),
     new PlaintextPasswordCheck(),
-    new RaceConditionCheck(),
-    new OtherVulnerabilitiesCheck(),
-    new RandomNumberGenerationCheck(),
-    new WeakHashingEncryptionCheck(),
-    new InfiniteLoopCheck(),
-    new IntegerFlowCheck(),
-    new PathTraversalCheck(),
-    new FileLevelSecurityCheck()
+     new RaceConditionCheck(),
+    // new OtherVulnerabilitiesCheck(),
+    // new RandomNumberGenerationCheck(),
+    // new WeakHashingEncryptionCheck(),
+    // new InfiniteLoopCheck(),
+    // new IntegerFlowCheck(),
+    // new PathTraversalCheck(),
+    // new FileLevelSecurityCheck()
 ];
 
 const execPromise = promisify(require('child_process').exec);
