@@ -16,7 +16,7 @@ import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
  import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
  import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
  import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
-// import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
+ import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
 // import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
 // import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 
@@ -32,7 +32,7 @@ const securityChecks: SecurityCheck[] = [
      new WeakHashingEncryptionCheck(),
      new InfiniteLoopCheck(),
      new IntegerFlowCheck(),
-    // new PathTraversalCheck(),
+     new PathTraversalCheck(),
     // new FileLevelSecurityCheck()
 ];
 
