@@ -136,6 +136,8 @@ export class PathTraversalCheck implements SecurityCheck {
                     }
                 }
             }
+
+            
             
             // Track assignment expressions
             if (node.type === 'assignment_expression') {
@@ -155,6 +157,7 @@ export class PathTraversalCheck implements SecurityCheck {
                             });
                         }
                     }
+                    
                     
                     // Track sanitization function calls
                     if (right.type === 'call_expression') {
@@ -298,6 +301,29 @@ export class PathTraversalCheck implements SecurityCheck {
                         }
                     }
                 }
+                // Inside call_expression
+                if (fnName === 'sprintf' && args.length >= 2) {
+                    const dst = args[0].text;
+                    for (let i = 1; i < args.length; i++) {
+                        const arg = args[i];
+                        if (arg.type === 'identifier' && taintedVariables.has(arg.text)) {
+                            taintedVariables.add(dst);
+                        }
+                    }
+                }
+
+                                // Command execution functions with potential path traversal
+                if (commandExecFunctions.includes(fnName)) {
+                    if (args.length > 0) {
+                        const arg = args[0];
+                        if (arg.type === 'identifier' && taintedVariables.has(arg.text)) {
+                            issues.push(
+                                `Warning: Unsanitized input "${arg.text}" passed to "${fnName}" at line ${line} in method "${methodName}". This may allow command injection or path traversal.`
+                            );
+                        }
+                    }
+                }
+
                 
                 // File inclusion functions can also lead to path traversal
                 if (fileInclusions.includes(fnName)) {
