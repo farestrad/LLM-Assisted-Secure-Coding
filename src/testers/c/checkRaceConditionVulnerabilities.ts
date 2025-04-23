@@ -42,9 +42,9 @@ export class RaceConditionCheck implements SecurityCheck {
         const fileAccessFunctions = config.get<string[]>('raceConditionKeywords', [
             // Standard C file operations
             'fopen', 'freopen', 'fwrite', 'fread', 'fprintf', 'fputs', 'fscanf',
-            'fgets', 'fgetc', 'ftell', 'fseek', 'rewind', 'fclose',
+            'fgets', 'fgetc', 'ftell', 'fseek', 'rewind', 
             // POSIX file operations
-            'open', 'read', 'write', 'close', 'pread', 'pwrite',
+            'open', 'read', 'write', 'pread', 'pwrite',
             // C++ file operations
             'ifstream', 'ofstream', 'fstream'
         ]);
