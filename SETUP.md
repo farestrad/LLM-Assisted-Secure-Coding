@@ -56,11 +56,12 @@ ExecStart=/usr/local/bin/ollama serve
 everything should be working.
 
 ## Test
-- ```curl -X POST http://178.128.231.xxx:11434/api/generate -d '{
+```
+curl -X POST http://178.128.231.xxx:11434/api/generate -d '{
   "model": "llama3",
   "prompt": "Why is the sky blue?",
   "stream": true}'
-  ```
+```
 
 ## Steps to setup reserve proxy
 ```sudo apt update && sudo apt install nginx -y```
