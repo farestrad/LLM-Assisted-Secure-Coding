@@ -313,22 +313,36 @@ export class WeakHashingEncryptionCheck implements SecurityCheck {
                 const fnName = node.child(0)?.text || '';
                 const resolvedFn = context.weakAliasMap.get(fnName) || fnName;
                 
-                // Check for weak hashing
                 if (matchAlgorithm(resolvedFn, weakHashFunctions)) {
                     context.weakHashes.set(fnName, {
                         node: node,
                         algorithm: resolvedFn
                     });
-                    
-                    const severity = context.passwordContext ? "Critical" : "Warning";
-                    const recommendation = context.passwordContext ?
-                        "Use strong password hashing like bcrypt, Argon2, or PBKDF2." :
-                        "Consider using SHA-256 or stronger.";
-                    
-                    issues.push(
-                        `${severity}: Weak hashing algorithm "${resolvedFn}" at ${formatLineInfo(node)} in method "${methodName}". ${recommendation}`
-                    );
+                
+                    // Check for potential hardcoded string argument
+                    const argList = node.child(1);
+                    const firstArg = argList?.namedChildren[0];
+                    const argLiteral = firstArg?.type.includes('string') ? firstArg.text : null;
+                
+                    let lineInfo = formatLineInfo(node);
+                    let baseMsg = `[WeakHashing] Insecure hash function "${resolvedFn}" used at ${lineInfo} in method "${methodName}".`;
+                    let extra: string[] = [];
+                
+                    // Add password-related advice
+                    if (context.passwordContext) {
+                        extra.push(`Use strong password hashing like bcrypt, Argon2, or PBKDF2.`);
+                    } else {
+                        extra.push(`Consider using SHA-256 or stronger.`);
+                    }
+                
+                    // If hardcoded secret is passed into MD5
+                    if (argLiteral && isLikelySecret(argLiteral)) {
+                        extra.push(`Avoid hardcoded secrets like ${argLiteral}.`);
+                    }
+                
+                    issues.push(`${baseMsg} ${extra.join(' ')}`);
                 }
+                
                 
                 // Check for weak encryption
                 if (matchAlgorithm(resolvedFn, weakEncryptionAlgorithms) || 
@@ -388,11 +402,15 @@ export class WeakHashingEncryptionCheck implements SecurityCheck {
                 const fieldName = node.child(node.namedChildCount - 1)?.text || '';
                 
                 // Check for weak encryption/hash settings in fields
-                if (matchAlgorithm(fieldName, [...weakHashFunctions, ...weakEncryptionAlgorithms])) {
+                if (
+                    matchAlgorithm(fieldName, [...weakEncryptionAlgorithms]) &&  // 👈 Only encryption, skip hashes
+                    !context.weakHashes.has(fieldName) // 👈 Avoid if already processed
+                ) {
                     issues.push(
-                        `Warning: Weak cryptographic algorithm "${fieldName}" referenced at ${formatLineInfo(node)} in method "${methodName}".`
+                        `Warning: Weak encryption algorithm "${fieldName}" referenced at ${formatLineInfo(node)} in method "${methodName}".`
                     );
                 }
+                
                 
                 // Check for ECB mode in fields
                 if (checkForEcbMode(node)) {

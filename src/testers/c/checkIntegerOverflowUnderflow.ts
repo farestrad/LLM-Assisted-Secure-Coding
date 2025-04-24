@@ -208,15 +208,7 @@ export class IntegerFlowCheck implements SecurityCheck {
                                     `Warning: Potential integer overflow/underflow detected in method "${methodName}" during declaration of "${varName}" at line ${line}.`
                                 );
                             }
-                            
-                            // Check explicit numeric overflow
-                            if (evalResult.value !== null && 
-                                (evalResult.value > MAX_INT || evalResult.value < MIN_INT)) {
-                                const line = getLineNumber(child);
-                                issues.push(
-                                    `Warning: Integer overflow/underflow detected in method "${methodName}" during declaration of "${varName}" at line ${line}.`
-                                );
-                            }
+                         
                         }
                     }
                 }
