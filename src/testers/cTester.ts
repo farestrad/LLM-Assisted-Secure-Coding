@@ -10,10 +10,11 @@ import { SecurityCheck } from "./c/SecurityCheck";
 import { 
     CWE, 
     CWE_DATABASE, 
-    securityCheckToCWE, 
     CVE_MAPPING, 
-    getCWEsForSecurityCheck 
+    getCWEsForSecurityCheck, 
+    getCWEsForIssues
 } from '../SecurityAnalysisProvider';
+
 
 // Dynamically import all security checks
 import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
@@ -53,64 +54,73 @@ const vulnerabilityDatabaseProvider = new VulnerabilityDatabaseProvider();
  **/
 export async function runCTests(code: string, securityAnalysisProvider: any) {
     try {
-        // Step 1: Extract methods from the code
         const methods = CCodeParser.extractFunctions(code);
 
-        // Step 2: Analyze each method for vulnerabilities
         const securityIssues: string[] = [];
-        const foundCves: { id: string; description: string }[] = []; 
-        const matchedCWEs = new Set<CWE>(); // Store matched CWEs without duplicates
+        const foundCves: { id: string; description: string }[] = [];
+        const matchedCWEs = new Set<CWE>();
+        const issuesByCheckType: Map<string, string[]> = new Map();
 
         methods.forEach((func) => {
-            const { issues, cweIds } = analyzeFunctionForSecurityIssues(func);
+            const { issues, checkTypes } = analyzeFunctionForSecurityIssues(func);
             securityIssues.push(...issues);
 
-            // Collect CWE details for matched CWE IDs
-            cweIds.forEach(cweId => {
-                const cwe = CWE_DATABASE[cweId];
-                if (cwe) {
-                    matchedCWEs.add(cwe);
+            for (const [issue, checkName] of checkTypes.entries()) {
+                if (!issuesByCheckType.has(checkName)) {
+                    issuesByCheckType.set(checkName, []);
                 }
-            });
-
-            // Collect CVEs for found issues organized by check name
-            if (issues.length > 0) {
-                // Track which check types have been found to avoid duplicate CVEs
-                const foundCheckTypes = new Set<string>();
-                
-                issues.forEach(issue => {
-                    // Extract the check name from the issue message if possible
-                    const checkName = extractCheckNameFromIssue(issue);
-                    
-                    if (checkName && !foundCheckTypes.has(checkName)) {
-                        foundCheckTypes.add(checkName);
-                        
-                        const cvesForCheck = CVE_MAPPING[checkName];
-                        if (cvesForCheck) {
-                            foundCves.push(...cvesForCheck);
-                        }
-                    }
-                });
+                issuesByCheckType.get(checkName)!.push(issue);
             }
         });
 
-        // Step 3: Update the security analysis provider with found issues, CWEs, and CVEs
+        // Apply CWE prioritization and collect CVEs
+        for (const [checkName, issues] of issuesByCheckType.entries()) {
+            const prioritizedCWEIds = getCWEsForIssues(checkName, issues);
+            for (const cweId of prioritizedCWEIds) {
+                const cwe = CWE_DATABASE[cweId];
+                if (cwe) matchedCWEs.add(cwe);
+            }
+
+            const cves = CVE_MAPPING[checkName];
+            if (cves) foundCves.push(...cves);
+        }
+
         securityAnalysisProvider.updateSecurityAnalysis(
-            securityIssues, 
-            foundCves, 
+            securityIssues,
+            foundCves,
             Array.from(matchedCWEs)
         );
 
     } catch (error) {
-        // Safely handle the error by checking its type
-        if (error instanceof Error) {
-            console.error('Error in runCTests:', error.message);
-            securityAnalysisProvider.updateSecurityAnalysis([`Error during testing: ${error.message}`]);
-        } else {
-            console.error('Unexpected error in runCTests:', error);
-            securityAnalysisProvider.updateSecurityAnalysis([`Unexpected error during testing: ${String(error)}`]);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('Error in runCTests:', message);
+        securityAnalysisProvider.updateSecurityAnalysis([`Error during testing: ${message}`]);
+    }
+}
+
+function analyzeFunctionForSecurityIssues(func: {
+    name: string;
+    returnType: string;
+    parameters: { type: string; name: string }[];
+    lineNumber: number;
+    functionBody: string;
+    functionCalls: string[];
+}): { issues: string[], checkTypes: Map<string, string> } {
+    const issues: string[] = [];
+    const checkTypes: Map<string, string> = new Map();
+
+    for (const check of securityChecks) {
+        const checkName = check.constructor.name;
+        const foundIssues = check.check(func.functionBody, func.name);
+
+        for (const issue of foundIssues) {
+            const annotated = `${issue} (${checkName})`;
+            issues.push(annotated);
+            checkTypes.set(annotated, checkName);
         }
     }
+
+    return { issues, checkTypes };
 }
 
 /**
@@ -150,37 +160,7 @@ function extractCheckNameFromIssue(issue: string): string | null {
     return null;
 }
 
-/**
- * Analyze a single method for security vulnerabilities.
- **/
-function analyzeFunctionForSecurityIssues(func: {
-    name: string;
-    returnType: string;
-    parameters: { type: string; name: string }[];
-    lineNumber: number;
-    functionBody: string;
-    functionCalls: string[];
-}): { issues: string[], cweIds: number[] } {
-    const issues: string[] = [];
-    const cweIds: Set<number> = new Set<number>(); // Use a Set to avoid duplicates
 
-    securityChecks.forEach(check => {
-        const checkName = check.constructor.name;
-        const cweIdsForCheck = securityCheckToCWE[checkName] || [];
-        const foundIssues = check.check(func.functionBody, func.name);
-
-        if (foundIssues.length > 0) {
-            // Annotate issues with check name for better tracking
-            const annotatedIssues = foundIssues.map(issue => `${issue} (${checkName})`);
-            issues.push(...annotatedIssues);
-
-            // Add all CWE IDs for this check to our set
-            cweIdsForCheck.forEach(id => cweIds.add(id));
-        }
-    });
-
-    return { issues, cweIds: Array.from(cweIds) };
-}
 
 /**
  * Fetch CVE details for identified security issues.
