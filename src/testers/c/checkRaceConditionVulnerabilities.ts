@@ -343,11 +343,39 @@ export class RaceConditionCheck implements SecurityCheck {
                 // Track operations that might involve files
                 if (fileAccessFunctions.includes(fnName)) {
                     // Different handling based on function type
-                    if (fnName === 'fopen' || fnName === 'open') {
-                        // For open operations, the first arg is the path
+                    if (fnName === 'open') {
+                        const pathArg = argList?.namedChildren[0];
+                        const flagsArg = argList?.namedChildren[1];
+                    
+                        const isUnsafeFlags = !containsSafeFlag(flagsArg);
+
+                    
+                        trackFileOperation(node, fnName, pathArg);
+                    
+                        if (isUnsafeFlags && !context.synchronizedContext) {
+                            const isPartOfSafePattern = isSafeFileOperationPattern();
+                            if (detectionLevel === 'strict' || 
+                               (detectionLevel === 'moderate' && !isPartOfSafePattern)) {
+                                issues.push(
+                                    `Warning: Unprotected file operation "${fnName}" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking or safe flags like O_NOFOLLOW.`
+                                );
+                            }
+                        }
+                    } else if (fnName === 'fopen') {
                         const pathArg = argList?.namedChildren[0];
                         trackFileOperation(node, fnName, pathArg);
-                    } else if (fnName === 'fclose' || fnName === 'close') {
+                    
+                        if (!context.synchronizedContext) {
+                            const isPartOfSafePattern = isSafeFileOperationPattern();
+                            if (detectionLevel === 'strict' || 
+                               (detectionLevel === 'moderate' && !isPartOfSafePattern)) {
+                                issues.push(
+                                    `Warning: Unprotected file operation "fopen" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking.`
+                                );
+                            }
+                        }
+                    }
+                     else if (fnName === 'fclose' || fnName === 'close') {
                         // For close operations, the first arg is the file descriptor
                         const fdArg = argList?.namedChildren[0];
                         trackFileOperation(node, fnName, undefined, fdArg);
@@ -362,7 +390,8 @@ export class RaceConditionCheck implements SecurityCheck {
                     }
                     
                     // Only warn if conditions are met
-                    if (!context.synchronizedContext) {
+                    if (context.synchronizedContext && fnName !== 'open' && fnName !== 'fopen' && fnName !== 'fclose' && fnName !== 'close') 
+                     {
                         // Run the check for safe patterns AFTER we've tracked this operation
                         const isPartOfSafePattern = isSafeFileOperationPattern();
                         
@@ -495,6 +524,23 @@ export class RaceConditionCheck implements SecurityCheck {
                 }
             }
         }
+
+
+        function containsSafeFlag(node: Parser.SyntaxNode | null | undefined): boolean {
+            if (!node) return false;
+        
+            if (node.type === 'identifier') {
+                return node.text === 'O_NOFOLLOW' || node.text === 'O_EXCL';
+            }
+        
+            if (node.type === 'binary_expression') {
+                return containsSafeFlag(node.child(0)) || containsSafeFlag(node.child(2));
+            }
+        
+            return false;
+        }
+        
+        
 
         // Special case for simple functions with standard I/O patterns
         // For our specific example, we need a more direct approach

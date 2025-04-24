@@ -46,11 +46,7 @@ export const CWE_DATABASE: { [id: number]: CWE } = {
         name: "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
         description: "The application constructs all or part of an OS command using externally-influenced input without neutralizing special elements."
     },
-    89: {
-        id: 89,
-        name: "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
-        description: "The application constructs SQL commands using input from an upstream component without neutralizing special elements."
-    },
+   
     94: {
         id: 94,
         name: "Improper Control of Generation of Code ('Code Injection')",
@@ -206,7 +202,7 @@ export const securityCheckToCWE: { [key: string]: number[] } = {
     'HeapOverflowCheck': [122, 590, 761], // Heap-based Buffer Overflow, Free of Memory not on the Heap, Free of Pointer not at Start of Buffer
     'PlaintextPasswordCheck': [256, 319], // Plaintext Storage of a Password, Cleartext Transmission of Sensitive Information
     'RaceConditionCheck': [362, 366, 367], // Race Condition, Race Condition within a Thread, Time-of-check Time-of-use Race Condition
-    'OtherVulnerabilitiesCheck': [78, 89, 94, 22], // OS Command Injection, SQL Injection, Code Injection, Path Traversal
+    'OtherVulnerabilitiesCheck': [78, 94, 22], // OS Command Injection, SQL Injection, Code Injection, Path Traversal
     'RandomNumberGenerationCheck': [330, 338], // Use of Insufficiently Random Values, Use of Cryptographically Weak PRNG
     'WeakHashingEncryptionCheck': [327, 328, 759], // Use of a Broken/Risky Cryptographic Algorithm, Reversible One-Way Hash, Use of a One-Way Hash without a Salt
     'InfiniteLoopCheck': [400, 835], // Uncontrolled Resource Consumption, Loop with Unreachable Exit Condition
@@ -266,12 +262,7 @@ export const CVE_MAPPING: { [key: string]: { id: string; description: string; cv
       }
     ],
     'RaceConditionCheck': [
-      {
-        id: "CVE-2021-1122",
-        description: "NULL pointer dereference in NVIDIA vGPU Manager may lead to denial of service.",
-        cvss: 5.5,
-        severity: "Medium"
-      },
+      
       {
         id: "CVE-2017-5555",
         description: "TOCTOU vulnerability in file handling allows attackers to manipulate privileged operations.",
@@ -286,12 +277,7 @@ export const CVE_MAPPING: { [key: string]: { id: string; description: string; cv
         cvss: 7.8,
         severity: "High"
       },
-      {
-        id: "CVE-2020-20915",
-        description: "SQL injection vulnerability in PublicCMS v4.0 allows remote code execution.",
-        cvss: 9.8,
-        severity: "Critical"
-      }
+      
     ],
     'RandomNumberGenerationCheck': [
       {
@@ -719,42 +705,42 @@ export function prioritizeCWEs(checkName: string, detectedIssues: string[] = [])
     
     // For injection issues
     'OtherVulnerabilitiesCheck': (issues, allCWEs) => {
-      const prioritizedCWEs = new Set<number>();
-      let hasCommandInjection = false;
-      let hasSQLInjection = false;
-      let hasCodeInjection = false;
-      
-      // Analyze issues to determine what specific vulnerabilities are present
-      issues.forEach(issue => {
-        if (issue.includes('command injection') || issue.includes('OS command')) {
-          hasCommandInjection = true;
-        }
-        if (issue.includes('SQL injection') || issue.includes('SQL command')) {
-          hasSQLInjection = true;
-        }
-        if (issue.includes('code injection') || issue.includes('code generation')) {
-          hasCodeInjection = true;
-        }
-      });
-      
-      // Add specific CWEs based on detected issues
-      if (hasCommandInjection) {
-        prioritizedCWEs.add(78); // CWE-78: Improper Neutralization of Special Elements used in an OS Command
-      }
-      if (hasSQLInjection) {
-        prioritizedCWEs.add(89); // CWE-89: Improper Neutralization of Special Elements used in an SQL Command
-      }
-      if (hasCodeInjection) {
-        prioritizedCWEs.add(94); // CWE-94: Improper Control of Generation of Code
-      }
-      
-      // If none of the specific issues were found, include all CWEs for this check
-      if (prioritizedCWEs.size === 0) {
-        allCWEs.forEach(cwe => prioritizedCWEs.add(cwe));
-      }
-      
-      return Array.from(prioritizedCWEs);
+  const prioritizedCWEs = new Set<number>();
+  let hasCommandInjection = false;
+  let hasCodeInjection = false;
+
+  // Analyze issues to determine what specific vulnerabilities are present
+  issues.forEach(issue => {
+    const lower = issue.toLowerCase();
+
+    if (
+      lower.includes('system(') || 
+      lower.includes('command injection') || 
+      lower.includes('os command')
+    ) {
+      hasCommandInjection = true;
     }
+
+    if (
+      lower.includes('code generation') || 
+      lower.includes('dynamic eval') || 
+      lower.includes('code injection')
+    ) {
+      hasCodeInjection = true;
+    }
+  });
+
+  if (hasCommandInjection) {
+    prioritizedCWEs.add(78); // OS Command Injection
+  }
+
+  if (hasCodeInjection) {
+    prioritizedCWEs.add(94); // Code Injection
+  }
+
+  return Array.from(prioritizedCWEs); // No fallback — only emit what’s truly matched
+}
+
   };
   
   /**
@@ -877,30 +863,33 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
         });
 
         // Update CVE assignments
-        this.updateCveAssignments(cveDetails);
+        this.updateCveAssignmentsFromCWEs(matchedCWEs);
         this.refresh();
         this.isAnalyzing = false;
     }
 
-    private updateCveAssignments(cveDetails: { id: string; description: string }[]): void {
-        this.cveItems = cveDetails.map(cve => {
-            const item = new vscode.TreeItem(
-                `${cve.id}`,
-                vscode.TreeItemCollapsibleState.None
-            );
-            
-            item.tooltip = `${cve.id}: ${cve.description}`;
-            
-            // Truncate long descriptions for display
-            let description = cve.description;
-            if (description.length > 80) {
-                description = description.substring(0, 77) + '...';
+    private updateCveAssignmentsFromCWEs(matchedCWEs: CWE[]): void {
+        const matchedCweIds = new Set(matchedCWEs.map(cwe => cwe.id));
+        const matchingCVEs: { id: string; description: string; cvss: number; severity: string }[] = [];
+    
+        // Go through each check in the mapping
+        for (const [checkName, cveList] of Object.entries(CVE_MAPPING)) {
+            const relatedCweIds = securityCheckToCWE[checkName] || [];
+    
+            // Only include CVEs if at least one CWE is in matchedCWEs
+            if (relatedCweIds.some(cweId => matchedCweIds.has(cweId))) {
+                matchingCVEs.push(...cveList);
             }
-            item.description = description;
-            
+        }
+    
+        this.cveItems = matchingCVEs.map(cve => {
+            const item = new vscode.TreeItem(`${cve.id}`, vscode.TreeItemCollapsibleState.None);
+            item.tooltip = `${cve.id}: ${cve.description}`;
+            item.description = cve.description.length > 80 ? cve.description.substring(0, 77) + '...' : cve.description;
             return item;
         });
     }
+    
 
     async analyzeLatestGeneratedCode(): Promise<void> {
         const code = this.generatedCodeProvider.getLatestGeneratedCode();

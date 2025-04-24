@@ -36,7 +36,6 @@ export class BufferOverflowCheck implements SecurityCheck {
             ['ctime', 'ctime_r'],
             ['tmpnam', 'mkstemp'],
             ['tmpfile', 'tmpfile_s'],
-            ['realpath', 'ensure buffer size is validated'],
         ]);
         
 
