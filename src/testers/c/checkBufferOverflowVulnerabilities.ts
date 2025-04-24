@@ -129,7 +129,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                         ) {
                             const origin = buffers.has(base) ? base : aliases.get(base) || 'unknown';
                             issues.push(
-                                `Warning: Pointer "${lhsName}" assigned with arithmetic on "${base}" (→ ${origin}) in "${methodName}"`
+                                `Warning: Pointer "${lhsName}" assigned with arithmetic on "${base}" (→ ${origin}) in "${methodName}" at line ${node.startPosition.row + 1}`
                             );
                         }
                     }
@@ -153,7 +153,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                     if (name && size !== null) {
                         buffers.set(name, size);
                         if (size > stackThreshold) {
-                            issues.push(`Warning: Large stack buffer "${name}" (${size} bytes) in "${methodName}"`);
+                            issues.push(`Warning: Large stack buffer "${name}" (${size} bytes) in "${methodName}" at line ${node.startPosition.row + 1}`);
                         }
                     }
                 }
@@ -189,7 +189,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                 if (fnName && unsafeFunctions.has(fnName)) {
                     const safer = unsafeFunctions.get(fnName);
                     issues.push(
-                        `Warning: Use of unsafe function "${fnName}" in "${methodName}". Consider the safer alternative: "${safer}"`
+                        `Warning: Use of unsafe function "${fnName}" in "${methodName}" at line ${node.startPosition.row + 1}. Consider the safer alternative: "${safer}"`
                     );
                 }
                 
@@ -217,15 +217,15 @@ export class BufferOverflowCheck implements SecurityCheck {
                             validationChecks.has(sizeArg) || /sizeof|strlen/.test(sizeArg);
                     
                         if (!isValidated) {
-                            //issues.push(
-                            //    `Warning: Unvalidated size parameter in strncpy to "${dest}" in "${methodName}"`
-                          //  );
+                            issues.push(
+                                `Warning: Unvalidated size parameter in strncpy to "${dest}" in "${methodName}" at line ${node.startPosition.row + 1}`
+                            );
                         }
                     
                         if (!validationChecks.has(dest) && !isValidatedByFunction(dest)) {
-                            //issues.push(
-                                //`Warning: Possible unsafe usage of "${fnName}" with "${dest}" in "${methodName}". Destination is not validated.`
-                            //);
+                            issues.push(
+                                `Warning: Possible unsafe usage of "${fnName}" with "${dest}" in "${methodName}" at line ${node.startPosition.row + 1}. Destination is not validated.`
+                            );
                         }
                     }
                     
@@ -257,7 +257,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                         const bufferSize = buffers.get(destBuffer)!;
                         if (totalSize > bufferSize) {
                             issues.push(
-                                `Warning: sprintf format string + argument may overflow buffer "${destBuffer}" (${bufferSize} bytes) in method "${methodName}". Estimated size: ${totalSize}`
+                                `Warning: sprintf format string + argument may overflow buffer "${destBuffer}" (${bufferSize} bytes) in method "${methodName}" at line ${node.startPosition.row + 1}. Estimated size: ${totalSize}`
                             );
                         }
                     }
@@ -273,7 +273,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                     console.log(`[DEBUG] validationChecks.has("${trimmed}") =`, validationChecks.has(trimmed));
                 
                     if (!validationChecks.has(trimmed)) {
-                        issues.push(`Warning: Untrusted allocation size "${trimmed}" in "${methodName}"`);
+                        issues.push(`Warning: Untrusted allocation size "${trimmed}" in "${methodName}" at line ${node.startPosition.row + 1}`);
                     }
                 }
                 
@@ -282,7 +282,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                 if (['malloc', 'calloc', 'realloc'].includes(fnName || '')) {
                     const assignedVar = node.parent?.type === 'assignment_expression' ? node.parent.child(0)?.text : null;
                     if (assignedVar && mallocAssigned.has(assignedVar) && !mallocChecked.has(assignedVar)) {
-                        issues.push(`Warning: Unchecked return value of "${fnName}" in "${methodName}"`);
+                        issues.push(`Warning: Unchecked return value of "${fnName}" in "${methodName}" at line ${node.startPosition.row + 1}`);
                     }
                 }
                 
@@ -302,7 +302,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                 
                     if (declaredSize && evaluatedSize && evaluatedSize > declaredSize) {
                         issues.push(
-                            `Warning: ${fnName} copying ${evaluatedSize} bytes into "${destBuffer}" (${declaredSize} bytes) in "${methodName}"`
+                            `Warning: ${fnName} copying ${evaluatedSize} bytes into "${destBuffer}" (${declaredSize} bytes) in "${methodName}" at line ${node.startPosition.row + 1}`
                         );
                     }
                 }
@@ -314,7 +314,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                     const isValidated = validationChecks.has(sizeArg) || /sizeof|strlen/.test(sizeArg);
                 
                     if (!isValidated) {
-                        issues.push(`Warning: Unvalidated size parameter in strncpy to "${dest}" in "${methodName}"`);
+                        issues.push(`Warning: Unvalidated size parameter in strncpy to "${dest}" in "${methodName}" at line ${node.startPosition.row + 1}`);
                     }
                 
                     // Check literal overflow if destination is known
@@ -323,7 +323,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                         const sizeValue = parseInt(sizeArg);
                         if (!isNaN(sizeValue) && sizeValue > bufferSize) {
                             issues.push(
-                                `Warning: strncpy copies ${sizeValue} bytes into buffer "${dest}" (${bufferSize} bytes) in "${methodName}". May overflow.`
+                                `Warning: strncpy copies ${sizeValue} bytes into buffer "${dest}" (${bufferSize} bytes) in "${methodName}" at line ${node.startPosition.row + 1}. May overflow.`
                             );
                         }
                     }
@@ -338,7 +338,7 @@ export class BufferOverflowCheck implements SecurityCheck {
             if (node.type === 'call_expression' && node.child(0)?.text === methodName) {
                 const bufferNames = Array.from(buffers.keys()).join(', ');
                 if (bufferNames) {
-                    issues.push(`Warning: Recursive function "${methodName}" with local buffers (${bufferNames})`);
+                    issues.push(`Warning: Recursive function "${methodName}" with local buffers (${bufferNames}) at line ${node.startPosition.row + 1}`);
                 }
             }
 
@@ -356,7 +356,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                     const varName = lhs.text;
                     if (buffers.has(varName) || aliases.has(varName) || mallocAssigned.has(varName)) {
                         const origin = buffers.get(varName) ? varName : aliases.get(varName) || 'unknown';
-                        issues.push(`Warning: Pointer arithmetic on buffer or pointer "${varName}" (→ ${origin}) in "${methodName}"`);
+                        issues.push(`Warning: Pointer arithmetic on buffer or pointer "${varName}" (→ ${origin}) in "${methodName}" at line ${node.startPosition.row + 1}`);
                     }
                 }
             }
@@ -383,7 +383,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                             const target = lhs.text;
                             if (buffers.has(base) || aliases.has(base) || mallocAssigned.has(base)) {
                                 const origin = buffers.has(base) ? base : aliases.get(base) || 'unknown';
-                                issues.push(`Warning: Pointer "${target}" assigned with arithmetic on "${base}" (→ ${origin}) in "${methodName}"`);
+                                issues.push(`Warning: Pointer "${target}" assigned with arithmetic on "${base}" (→ ${origin}) in "${methodName}" at line ${node.startPosition.row + 1}`);
                             }
                         }
                     }
@@ -407,7 +407,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                     const ptr = left.text;
                     if (buffers.has(ptr) || aliases.has(ptr) || mallocAssigned.has(ptr)) {
                         const origin = buffers.has(ptr) ? ptr : aliases.get(ptr) || 'unknown';
-                        issues.push(`Warning: Pointer arithmetic dereference on "${ptr}" (→ ${origin}) in "${methodName}"`);
+                        issues.push(`Warning: Pointer arithmetic dereference on "${ptr}" (→ ${origin}) in "${methodName}" at line ${node.startPosition.row + 1}`);
                     }
                 }
             }
@@ -425,7 +425,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                     const isLiteral = indexNode.type === 'number_literal';
             
                     if (!isLiteral && !validationChecks.has(index)) {
-                        issues.push(`Warning: Unvalidated index "${index}" used with "${buffer}" in "${methodName}"`);
+                        issues.push(`Warning: Unvalidated index "${index}" used with "${buffer}" in "${methodName}" at line ${node.startPosition.row + 1}`);
                     }
             
                     // Optional: warn if index constant exceeds buffer size
@@ -433,7 +433,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                         const maxIndex = parseInt(index);
                         const bufSize = buffers.get(buffer)!;
                         if (maxIndex >= bufSize) {
-                            issues.push(`Warning: Index "${maxIndex}" exceeds buffer size (${bufSize}) for "${buffer}" in "${methodName}"`);
+                            issues.push(`Warning: Index "${maxIndex}" exceeds buffer size (${bufSize}) for "${buffer}" in "${methodName}" at line ${node.startPosition.row + 1}`);
                         }
                     }
                 }
