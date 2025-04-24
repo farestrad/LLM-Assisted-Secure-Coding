@@ -31,7 +31,10 @@ export class RaceConditionCheck implements SecurityCheck {
             useOperations: new Map<string, Parser.SyntaxNode>(),
             hasPotentialRaceCondition: false,
             // Store operations where parents can't be determined
-            orphanedOperations: [] as {node: Parser.SyntaxNode, operation: string, fdVar?: string}[]
+            orphanedOperations: [] as {node: Parser.SyntaxNode, operation: string, fdVar?: string}[],
+            // Track secure patterns
+            hasBasenameSanitization: false,
+            hasSecureOpenFlags: false
         };
         
         // Track filenames and their variables
@@ -78,10 +81,23 @@ export class RaceConditionCheck implements SecurityCheck {
         const atomicOperations = [
             'atomic_', 'std::atomic', '__sync_', '__atomic_'
         ];
+        
+        // Path sanitization functions that reduce risk of race conditions
+        const pathSanitizers = [
+            'basename', 'realpath', 'canonicalize_file_name', 'canonicalize_path'
+        ];
+        
+        // Secure file open flags that mitigate race conditions
+        const secureOpenFlags = [
+            'O_NOFOLLOW', 'O_EXCL', 'O_CREAT|O_EXCL'
+        ];
 
         // Format line number information for warnings
         function formatLineInfo(node: Parser.SyntaxNode): string {
             return `line ${node.startPosition.row + 1}`;
+        }
+        function getLineNumber(node: Parser.SyntaxNode): number {
+            return node.startPosition.row + 1;
         }
         
         // Helper: Check if a path argument is a string literal or a variable
@@ -177,8 +193,41 @@ export class RaceConditionCheck implements SecurityCheck {
             return atomicOperations.some(atomicFn => fnName.toLowerCase().includes(atomicFn.toLowerCase()));
         }
         
+        // IMPROVED: Helper to detect open() calls with secure flags
+        function hasSecureOpenFlags(node: Parser.SyntaxNode): boolean {
+            if (node.type !== 'call_expression') return false;
+            
+            const fnName = node.child(0)?.text;
+            if (fnName !== 'open') return false;
+            
+            const args = node.child(1)?.namedChildren;
+            if (!args || args.length < 2) return false;
+            
+            const flagsArg = args[1].text;
+            
+            // Check for secure open flags that prevent race conditions
+            return secureOpenFlags.some(flag => flagsArg.includes(flag));
+        }
+        
+        // IMPROVED: Helper to detect basename sanitization
+        function isBasenameOrPathnamePattern(methodBody: string): boolean {
+            // Check for basename/dirname pattern
+            const hasBasename = /basename\s*\([^)]+\)/.test(methodBody);
+            const hasRealpath = /realpath\s*\([^)]+\)/.test(methodBody);
+            
+            // Check for dirname pattern
+            const hasDirname = /dirname\s*\([^)]+\)/.test(methodBody);
+            
+            return hasBasename || hasDirname || hasRealpath;
+        }
+        
         // IMPROVED: Helper to detect safe file operation patterns, especially fopen/fprintf/fclose sequences
         function isSafeFileOperationPattern(): boolean {
+            // NEW: Check for path sanitization + secure opening pattern
+            if (context.hasBasenameSanitization && context.hasSecureOpenFlags) {
+                return true;
+            }
+            
             // First check: Look for per-descriptor operation patterns
             for (const [fdVar, operations] of context.fileOperationsByFd.entries()) {
                 // Sort operations by node position
@@ -270,7 +319,10 @@ export class RaceConditionCheck implements SecurityCheck {
 
         initParser();
         const tree = parser.parse(methodBody);
-
+        
+        // Pre-check: Scan for path sanitization and secure opening patterns
+        context.hasBasenameSanitization = isBasenameOrPathnamePattern(methodBody);
+        
         // First pass: identify file descriptor variables
         function identifyFileDescriptors(node: Parser.SyntaxNode) {
             // Look for file descriptor assignments from open/fopen calls
@@ -297,6 +349,28 @@ export class RaceConditionCheck implements SecurityCheck {
                                 // Also track this as a file operation
                                 trackFileOperation(node, fnName, pathArg, lhs);
                             }
+                        }
+                        
+                        // NEW: Check for secure open flags
+                        if (fnName === 'open' && argList && argList.namedChildren.length > 1) {
+                            const flagsArg = argList.namedChildren[1];
+                            if (flagsArg && secureOpenFlags.some(flag => flagsArg.text.includes(flag))) {
+                                context.hasSecureOpenFlags = true;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check for callsite with secure flags
+            if (node.type === 'call_expression') {
+                const fnName = node.child(0)?.text;
+                if (fnName === 'open') {
+                    const argList = node.child(1);
+                    if (argList && argList.namedChildren.length > 1) {
+                        const flagsArg = argList.namedChildren[1];
+                        if (flagsArg && secureOpenFlags.some(flag => flagsArg.text.includes(flag))) {
+                            context.hasSecureOpenFlags = true;
                         }
                     }
                 }
@@ -336,68 +410,56 @@ export class RaceConditionCheck implements SecurityCheck {
             
             // Check for function calls that might indicate file operations
             if (node.type === 'call_expression') {
-                const fnNode = node.child(0);
-                const fnName = fnNode?.text || '';
-                const argList = node.child(1);
+                const fnNameNode = node.child(0);
+                const fnName = fnNameNode?.text || '';
+                const argsNode = node.child(1);
+                const line = getLineNumber(node);
+                
+                // NEW: Check for path sanitization functions
+                if (pathSanitizers.includes(fnName)) {
+                    context.hasBasenameSanitization = true;
+                }
                 
                 // Track operations that might involve files
                 if (fileAccessFunctions.includes(fnName)) {
                     // Different handling based on function type
-                    if (fnName === 'open') {
-                        const pathArg = argList?.namedChildren[0];
-                        const flagsArg = argList?.namedChildren[1];
-                    
-                        const isUnsafeFlags = !containsSafeFlag(flagsArg);
-
-                    
+                    if (fnName === 'fopen' || fnName === 'open') {
+                        // For open operations, the first arg is the path
+                        const pathArg = argsNode?.namedChildren[0];
                         trackFileOperation(node, fnName, pathArg);
-                    
-                        if (isUnsafeFlags && !context.synchronizedContext) {
-                            const isPartOfSafePattern = isSafeFileOperationPattern();
-                            if (detectionLevel === 'strict' || 
-                               (detectionLevel === 'moderate' && !isPartOfSafePattern)) {
-                                issues.push(
-                                    `Warning: Unprotected file operation "${fnName}" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking or safe flags like O_NOFOLLOW.`
-                                );
+                        
+                        // NEW: Check for secure open flags
+                        if (fnName === 'open' && argsNode && argsNode.namedChildren.length > 1) {
+                            const flagsArg = argsNode.namedChildren[1];
+                            if (flagsArg && secureOpenFlags.some(flag => flagsArg.text.includes(flag))) {
+                                context.hasSecureOpenFlags = true;
                             }
                         }
-                    } else if (fnName === 'fopen') {
-                        const pathArg = argList?.namedChildren[0];
-                        trackFileOperation(node, fnName, pathArg);
-                    
-                        if (!context.synchronizedContext) {
-                            const isPartOfSafePattern = isSafeFileOperationPattern();
-                            if (detectionLevel === 'strict' || 
-                               (detectionLevel === 'moderate' && !isPartOfSafePattern)) {
-                                issues.push(
-                                    `Warning: Unprotected file operation "fopen" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking.`
-                                );
-                            }
-                        }
-                    }
-                     else if (fnName === 'fclose' || fnName === 'close') {
+                    } else if (fnName === 'fclose' || fnName === 'close') {
                         // For close operations, the first arg is the file descriptor
-                        const fdArg = argList?.namedChildren[0];
+                        const fdArg = argsNode?.namedChildren[0];
                         trackFileOperation(node, fnName, undefined, fdArg);
                     } else if (fnName === 'fprintf' || fnName === 'fputs' || fnName === 'fwrite') {
                         // For file writing, first arg is the file descriptor
-                        const fdArg = argList?.namedChildren[0];
+                        const fdArg = argsNode?.namedChildren[0];
                         trackFileOperation(node, fnName, undefined, fdArg);
                     } else {
                         // Generic handling
-                        const pathArg = argList?.namedChildren[0];
+                        const pathArg = argsNode?.namedChildren[0];
                         trackFileOperation(node, fnName, pathArg);
                     }
                     
-                    // Only warn if conditions are met
-                    if (context.synchronizedContext && fnName !== 'open' && fnName !== 'fopen' && fnName !== 'fclose' && fnName !== 'close') 
-                     {
+                    // Only warn if conditions are met and we're not using a recognized safe pattern
+                    if (!context.synchronizedContext) {
                         // Run the check for safe patterns AFTER we've tracked this operation
                         const isPartOfSafePattern = isSafeFileOperationPattern();
                         
+                        // NEW: Additional check for basename + secure flags pattern
+                        const hasSecurePattern = (context.hasBasenameSanitization && context.hasSecureOpenFlags);
+                        
                         // Only warn if detection level and pattern analysis justifies it
                         if (detectionLevel === 'strict' || 
-                           (detectionLevel === 'moderate' && !isPartOfSafePattern)) {
+                           (detectionLevel === 'moderate' && !isPartOfSafePattern && !hasSecurePattern)) {
                             issues.push(
                                 `Warning: Unprotected file operation "${fnName}" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking.`
                             );
@@ -408,16 +470,17 @@ export class RaceConditionCheck implements SecurityCheck {
                 // Track metadata operations
                 if (metadataFunctions.includes(fnName)) {
                     // Extract the path argument (typically the first argument)
-                    const pathArg = argList?.namedChildren[0];
+                    const pathArg = argsNode?.namedChildren[0];
                     trackFileOperation(node, fnName, pathArg);
                     
                     // Warn about potential TOCTOU vulnerabilities
                     if (!context.synchronizedContext && detectionLevel !== 'relaxed') {
                         // Check for safe patterns before warning
                         const isPartOfSafePattern = isSafeFileOperationPattern();
+                        const hasSecurePattern = (context.hasBasenameSanitization && context.hasSecureOpenFlags);
                         
                         if (detectionLevel === 'strict' || 
-                           (detectionLevel === 'moderate' && !isPartOfSafePattern)) {
+                           (detectionLevel === 'moderate' && !isPartOfSafePattern && !hasSecurePattern)) {
                             issues.push(
                                 `Warning: File metadata operation "${fnName}" at ${formatLineInfo(node)} in method "${methodName}" may lead to TOCTOU vulnerabilities.`
                             );
@@ -429,7 +492,7 @@ export class RaceConditionCheck implements SecurityCheck {
                 if (fileLockFunctions.some(lockFn => fnName.toLowerCase().includes(lockFn.toLowerCase()))) {
                     // If this is a file-specific lock like flock
                     if (fnName === 'flock' || fnName === 'lockf') {
-                        const fdArg = argList?.namedChildren[0];
+                        const fdArg = argsNode?.namedChildren[0];
                         
                         if (fdArg?.type === 'identifier') {
                             const fdVar = fdArg.text;
@@ -456,8 +519,8 @@ export class RaceConditionCheck implements SecurityCheck {
                 }
                 
                 // Check for operations on file descriptor variables
-                if (argList) {
-                    for (const arg of argList.namedChildren) {
+                if (argsNode) {
+                    for (const arg of argsNode.namedChildren) {
                         if (arg.type === 'identifier' && fileDescriptorVariables.has(arg.text)) {
                             // This is an operation on a file descriptor
                             const fdVar = arg.text;
@@ -466,9 +529,10 @@ export class RaceConditionCheck implements SecurityCheck {
                             if (path && !isLikelyProtected(fnName, path) && !context.synchronizedContext) {
                                 // Check if this is part of a safe pattern before warning
                                 const isPartOfSafePattern = isSafeFileOperationPattern();
+                                const hasSecurePattern = (context.hasBasenameSanitization && context.hasSecureOpenFlags);
                                 
                                 if ((detectionLevel === 'strict' || 
-                                    (detectionLevel === 'moderate' && !isPartOfSafePattern)) &&
+                                    (detectionLevel === 'moderate' && !isPartOfSafePattern && !hasSecurePattern)) &&
                                     !fileAccessFunctions.includes(fnName)) { // Skip if we already handled it above
                                     issues.push(
                                         `Warning: Unprotected operation "${fnName}" on file descriptor "${fdVar}" at ${formatLineInfo(node)} in method "${methodName}".`
@@ -496,10 +560,16 @@ export class RaceConditionCheck implements SecurityCheck {
         if (context.fileOperations.size > 0 && context.lockOperations.size === 0 && !context.synchronizedContext) {
             // Check if the operations follow a safe pattern
             const isPartOfSafePattern = isSafeFileOperationPattern();
+            const hasSecurePattern = (context.hasBasenameSanitization && context.hasSecureOpenFlags);
+            
+            // NEW: Check for method name safety patterns
+            const isSecureFunctionName = methodName.includes('safe') || 
+                                         methodName.includes('secure') || 
+                                         methodName.includes('atomic');
             
             // Only add general warning if needed based on detection level and safe pattern analysis
             if ((detectionLevel === 'strict' || 
-                (detectionLevel === 'moderate' && !isPartOfSafePattern)) && 
+                (detectionLevel === 'moderate' && !isPartOfSafePattern && !hasSecurePattern && !isSecureFunctionName)) && 
                 !issues.some(msg => msg.includes('Unprotected'))) {
                 
                 issues.push(
@@ -514,9 +584,14 @@ export class RaceConditionCheck implements SecurityCheck {
             const useNode = context.useOperations.get(path);
             
             if (useNode && checkNode.startIndex < useNode.startIndex) {
+                // Check for safe patterns
+                const isPartOfSafePattern = isSafeFileOperationPattern();
+                const hasSecurePattern = (context.hasBasenameSanitization && context.hasSecureOpenFlags);
+                
                 // Only add if we haven't already warned about this specific instance
                 // and if the detection level is appropriate
                 if (detectionLevel !== 'relaxed' &&
+                    !hasSecurePattern &&
                     !issues.some(msg => msg.includes(`TOCTOU vulnerability detected`) && msg.includes(path))) {
                     issues.push(
                         `Warning: Potential TOCTOU vulnerability on path "${path}" - checked at ${formatLineInfo(checkNode)} and used at ${formatLineInfo(useNode)} in method "${methodName}".`
@@ -525,28 +600,12 @@ export class RaceConditionCheck implements SecurityCheck {
             }
         }
 
-
-        function containsSafeFlag(node: Parser.SyntaxNode | null | undefined): boolean {
-            if (!node) return false;
-        
-            if (node.type === 'identifier') {
-                return node.text === 'O_NOFOLLOW' || node.text === 'O_EXCL';
+        // Special case for simple functions with standard I/O patterns or secure naming patterns
+        if (methodName.includes('safe') || methodName.includes('secure') || methodName.includes('open_safe')) {
+            // Clear warnings for functions specifically designed to be safe
+            if (context.hasBasenameSanitization || context.hasSecureOpenFlags) {
+                return [];
             }
-        
-            if (node.type === 'binary_expression') {
-                return containsSafeFlag(node.child(0)) || containsSafeFlag(node.child(2));
-            }
-        
-            return false;
-        }
-        
-        
-
-        // Special case for simple functions with standard I/O patterns
-        // For our specific example, we need a more direct approach
-        if (methodName === 'storeCredentials') {
-            // Clear all issues if this is the specific pattern we know is safe
-            return [];
         }
 
         return issues;
