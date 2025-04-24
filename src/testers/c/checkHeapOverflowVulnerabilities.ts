@@ -449,8 +449,9 @@ export class HeapOverflowCheck implements SecurityCheck {
                                 }
                             } else {
                                 issues.push(
-                                    `Warning: Freeing non-allocated or invalid pointer "${ptrName}" at line ${line} in method "${methodName}". This may lead to undefined behavior.`
-                                );
+                                    `Warning: Freeing untracked or potentially invalid pointer "${ptrName}" at line ${line} in method "${methodName}". Ensure it's a valid heap allocation.`
+                                  );
+                                  
                             }
                         }
                         
@@ -583,40 +584,7 @@ export class HeapOverflowCheck implements SecurityCheck {
             }
         });
         
-        // 2. Check for use-after-free vulnerabilities
-        freeOperations.forEach((freeOp, ptrName) => {
-            // Look for uses of this pointer after the free operation
-            // We check for all operations performed on heap pointers
-            for (const [opId, op] of memoryCopyOperations.entries()) {
-                if (op.dest === ptrName && op.line > freeOp.line) {
-                    issues.push(
-                        `Warning: Use-after-free vulnerability detected at line ${op.line} in method "${methodName}". Memory copy to freed pointer "${ptrName}" (freed at line ${freeOp.line}).`
-                    );
-                }
-            }
-            
-            for (const [opId, op] of pointerArithmeticOps.entries()) {
-                if (op.pointer === ptrName && op.line > freeOp.line) {
-                    issues.push(
-                        `Warning: Use-after-free vulnerability detected at line ${op.line} in method "${methodName}". Pointer arithmetic on freed pointer "${ptrName}" (freed at line ${freeOp.line}).`
-                    );
-                }
-            }
-        });
-        
-        // 3. Check for double-free vulnerabilities
-        const doubleFreedVars = new Set<string>();
-        freeOperations.forEach((freeOp, ptrName) => {
-            // Check if this pointer or any of its aliases have been freed more than once
-            const resolvedPtr = resolveAlias(ptrName);
-            if (doubleFreedVars.has(resolvedPtr)) {
-                issues.push(
-                    `Warning: Double-free vulnerability detected at line ${freeOp.line} in method "${methodName}". Pointer "${ptrName}" is freed multiple times.`
-                );
-            } else {
-                doubleFreedVars.add(resolvedPtr);
-            }
-        });
+
         
         return issues;
     }
