@@ -222,53 +222,163 @@ export function getCWEsForSecurityCheck(checkName: string): CWE[] {
 }
 
 // Single, unified mapping of CVEs to security checks
-export const CVE_MAPPING: { [key: string]: { id: string; description: string }[] } = {
+export const CVE_MAPPING: { [key: string]: { id: string; description: string; cvss: number; severity: string }[] } = {
     'BufferOverflowCheck': [
-        { id: "CVE-2021-1234", description: "Buffer overflow in XYZ application allows remote attackers to execute arbitrary code." },
-        { id: "CVE-2019-9999", description: "Stack-based buffer overflow in ABC library allows attackers to execute arbitrary code." }
+      {
+        id: "CVE-2021-3156",
+        description: "Heap-based buffer overflow in Sudo's pwfeedback option allows privilege escalation.",
+        cvss: 7.8,
+        severity: "High"
+      },
+      {
+        id: "CVE-2021-22986",
+        description: "Buffer overflow in F5 BIG-IP iControl REST interface allows remote code execution.",
+        cvss: 9.8,
+        severity: "Critical"
+      }
     ],
     'HeapOverflowCheck': [
-        { id: "CVE-2021-5678", description: "Heap overflow in ABC library allows attackers to crash the application." },
-        { id: "CVE-2020-8888", description: "Use-after-free vulnerability in XYZ application allows remote attackers to execute arbitrary code." }
+      {
+        id: "CVE-2021-4214",
+        description: "Heap overflow in libpng's pngimage.c allows attackers to execute arbitrary code.",
+        cvss: 7.8,
+        severity: "High"
+      },
+      {
+        id: "CVE-2020-6551",
+        description: "Use-after-free in WebXR in Google Chrome prior to 84.0.4147.125 allows remote attackers to exploit heap corruption.",
+        cvss: 8.8,
+        severity: "High"
+      }
     ],
     'PlaintextPasswordCheck': [
-        { id: "CVE-2021-9101", description: "Storing passwords in plaintext in XYZ application leads to unauthorized access." },
-        { id: "CVE-2018-7777", description: "Credentials transmitted in cleartext in ABC service, allowing attackers to intercept sensitive information." }
+      {
+        id: "CVE-2024-3082",
+        description: "Plaintext storage of administrative password allows attackers with physical access to retrieve credentials.",
+        cvss: 6.8,
+        severity: "Medium"
+      },
+      {
+        id: "CVE-2018-10822",
+        description: "D-Link routers store administrative passwords in plaintext, accessible via directory traversal.",
+        cvss: 8.8,
+        severity: "High"
+      }
     ],
     'RaceConditionCheck': [
-        { id: "CVE-2021-1122", description: "Race condition in ABC service allows attackers to bypass security checks." },
-        { id: "CVE-2017-5555", description: "TOCTOU vulnerability in file handling allows attackers to manipulate privileged operations." }
+      {
+        id: "CVE-2021-1122",
+        description: "NULL pointer dereference in NVIDIA vGPU Manager may lead to denial of service.",
+        cvss: 5.5,
+        severity: "Medium"
+      },
+      {
+        id: "CVE-2017-5555",
+        description: "TOCTOU vulnerability in file handling allows attackers to manipulate privileged operations.",
+        cvss: 7.0,
+        severity: "High"
+      }
     ],
     'OtherVulnerabilitiesCheck': [
-        { id: "CVE-2021-3344", description: "Command injection vulnerability in XYZ application allows attackers to execute arbitrary OS commands." },
-        { id: "CVE-2020-4321", description: "SQL injection in ABC service allows attackers to access sensitive database information." }
+      {
+        id: "CVE-2021-3344",
+        description: "Privilege escalation in OpenShift builder allows users to overwrite container images.",
+        cvss: 7.8,
+        severity: "High"
+      },
+      {
+        id: "CVE-2020-20915",
+        description: "SQL injection vulnerability in PublicCMS v4.0 allows remote code execution.",
+        cvss: 9.8,
+        severity: "Critical"
+      }
     ],
     'RandomNumberGenerationCheck': [
-        { id: "CVE-2021-5566", description: "Weak random number generation in ABC library leads to predictable values." },
-        { id: "CVE-2019-1212", description: "Insufficient entropy in PRNG implementation allows attackers to predict generated values." }
+      {
+        id: "CVE-2024-57835",
+        description: "Use of cryptographically weak pseudo-random number generator in TANIGUCHI product.",
+        cvss: 5.9,
+        severity: "Medium"
+      },
+      {
+        id: "CVE-2019-1212",
+        description: "Memory corruption in Windows DHCP service when processing crafted packets.",
+        cvss: 7.5,
+        severity: "High"
+      }
     ],
     'WeakHashingEncryptionCheck': [
-        { id: "CVE-2021-7788", description: "Weak hashing algorithm used in XYZ application allows for hash collisions." },
-        { id: "CVE-2018-9876", description: "Use of MD5 for password storage in ABC service makes password hashes vulnerable to cracking." }
+      {
+        id: "CVE-2023-0452",
+        description: "Econolite EOS uses MD5 for encrypting privileged user credentials.",
+        cvss: 7.5,
+        severity: "High"
+      },
+      {
+        id: "CVE-2018-4932",
+        description: "Use-after-free vulnerability in Adobe Flash Player allows arbitrary code execution.",
+        cvss: 9.8,
+        severity: "Critical"
+      }
     ],
     'InfiniteLoopCheck': [
-        { id: "CVE-2021-9900", description: "Infinite loop in ABC service leads to denial of service." },
-        { id: "CVE-2020-5544", description: "Resource exhaustion through uncontrolled loop in XYZ application allows for DoS attacks." }
+      {
+        id: "CVE-2022-0778",
+        description: "Infinite loop in OpenSSL when parsing invalid certificates can lead to denial of service.",
+        cvss: 7.5,
+        severity: "High"
+      },
+      {
+        id: "CVE-2021-46828",
+        description: "Loop with unreachable exit condition in certain software configurations.",
+        cvss: 5.5,
+        severity: "Medium"
+      }
     ],
     'IntegerFlowCheck': [
-        { id: "CVE-2021-1235", description: "Integer overflow in XYZ application allows for buffer overflow." },
-        { id: "CVE-2019-8765", description: "Integer underflow in memory allocation leads to exploitable condition in ABC library." }
+      {
+        id: "CVE-2021-22986",
+        description: "Integer overflow in F5 BIG-IP iControl REST interface allows remote code execution.",
+        cvss: 9.8,
+        severity: "Critical"
+      },
+      {
+        id: "CVE-2019-1212",
+        description: "Memory corruption in Windows DHCP service due to integer underflow.",
+        cvss: 7.5,
+        severity: "High"
+      }
     ],
     'PathTraversalCheck': [
-        { id: "CVE-2021-6789", description: "Path traversal vulnerability in ABC application allows unauthorized file access." },
-        { id: "CVE-2018-3311", description: "Directory traversal in file upload functionality allows attackers to access sensitive files." }
+      {
+        id: "CVE-2018-10822",
+        description: "Directory traversal in D-Link routers allows unauthorized file access.",
+        cvss: 8.8,
+        severity: "High"
+      },
+      {
+        id: "CVE-2018-3311",
+        description: "Directory traversal in file upload functionality allows attackers to access sensitive files.",
+        cvss: 7.5,
+        severity: "High"
+      }
     ],
     'FloatingInMemoryCheck': [
-        { id: "CVE-2021-4455", description: "Use-after-free vulnerability in memory management allows for arbitrary code execution." },
-        { id: "CVE-2019-6545", description: "Double-free vulnerability in XYZ application leads to memory corruption." }
+      {
+        id: "CVE-2020-6551",
+        description: "Use-after-free in WebXR in Google Chrome allows remote attackers to exploit heap corruption.",
+        cvss: 8.8,
+        severity: "High"
+      },
+      {
+        id: "CVE-2020-0674",
+        description: "Use-after-free vulnerability in Microsoft Internet Explorer 11 allows arbitrary code execution.",
+        cvss: 7.5,
+        severity: "High"
+      }
     ]
-};
-
+  };
+  
 
 // Enhanced mapping with prioritization logic to reduce redundancy
 
