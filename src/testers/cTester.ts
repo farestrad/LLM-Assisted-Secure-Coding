@@ -17,13 +17,13 @@ import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
  import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
  import { IntegerFlowCheck } from "./c/checkIntegerOverflowUnderflow";
  import { PathTraversalCheck } from "./c/checkPathTraversalVulnerabilities";
-// import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
+ import { FloatingInMemoryCheck } from "./c/FloatingInMemoryCheck";
 // import { FileLevelSecurityCheck } from "./c/FileLevelSecurityCheck";
 
 // Create an array of all security checks
 const securityChecks: SecurityCheck[] = [
     // new BufferOverflowCheck(),
-    // new FloatingInMemoryCheck(),
+     new FloatingInMemoryCheck(),
     // new HeapOverflowCheck(),
     new PlaintextPasswordCheck(),
      new RaceConditionCheck(),
