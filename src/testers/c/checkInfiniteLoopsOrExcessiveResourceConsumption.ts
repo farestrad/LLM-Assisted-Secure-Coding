@@ -278,46 +278,44 @@ export class InfiniteLoopCheck implements SecurityCheck {
             return excessiveAllocation;
         }
         
-        // Detect if a condition is always true or has no exit condition
         function isAlwaysTrueCondition(conditionNode: Parser.SyntaxNode | null): boolean {
-            if (!conditionNode) return true; // No condition means infinite
-            
-            const conditionText = conditionNode.text.trim();
-            
-            // Direct constants
-            if (conditionText === '1' || 
-                conditionText.toLowerCase() === 'true' || 
-                conditionText === '!0') {
+            if (!conditionNode) return true;
+        
+            // Case: direct number literal like `1`
+            if (conditionNode.type === 'number_literal' && conditionNode.text.trim() === '1') {
                 return true;
             }
-            
-            // Check for expressions that are always true
-            if (conditionNode.type === 'binary_expression') {
-                const operator = conditionNode.child(1)?.text;
-                const lhs = conditionNode.child(0);
-                const rhs = conditionNode.child(2);
-                
-                // Check for expressions like (1 == 1) or (2 > 1)
-                if (lhs?.type === 'number_literal' && rhs?.type === 'number_literal') {
-                    if (operator === '==' && lhs.text === rhs.text) {
-                        return true;
-                    }
-                    
-                    // Other tautologies like (1 <= 2)
-                    if (operator === '<=' || operator === '>=') {
-                        const lhsValue = parseInt(lhs.text, 10);
-                        const rhsValue = parseInt(rhs.text, 10);
-                        
-                        if ((operator === '<=' && lhsValue <= rhsValue) ||
-                            (operator === '>=' && lhsValue >= rhsValue)) {
-                            return true;
-                        }
-                    }
+        
+            // Case: (1) or (!0) wrapped in a parenthesized_expression
+            if (conditionNode.type === 'parenthesized_expression') {
+                const inner = conditionNode.namedChildren[0];
+                if (inner?.type === 'number_literal' && inner.text.trim() === '1') {
+                    return true;
+                }
+                if (inner?.type === 'unary_expression' && inner.text.trim() === '!0') {
+                    return true;
                 }
             }
-            
+        
+            // Check tautologies like (1 == 1)
+            if (conditionNode.type === 'binary_expression') {
+                const op = conditionNode.child(1)?.text;
+                const lhs = conditionNode.child(0);
+                const rhs = conditionNode.child(2);
+        
+                if (lhs?.type === 'number_literal' && rhs?.type === 'number_literal') {
+                    const l = parseInt(lhs.text, 10);
+                    const r = parseInt(rhs.text, 10);
+        
+                    if (op === '==' && l === r) return true;
+                    if (op === '<=' && l <= r) return true;
+                    if (op === '>=' && l >= r) return true;
+                }
+            }
+        
             return false;
         }
+        
         
         // Process the AST to find loops and other relevant nodes
         initParser();
