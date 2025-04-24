@@ -7,11 +7,11 @@ import { SecurityCheck } from "./c/SecurityCheck";
 import { TOP_CWES, CVE_MAPPING } from '../SecurityAnalysisProvider';
 
 // Dynamically import all security checks
-// import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
-// import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
+ import { BufferOverflowCheck } from "./c/checkBufferOverflowVulnerabilities";
+ import { HeapOverflowCheck } from "./c/checkHeapOverflowVulnerabilities";
 import { PlaintextPasswordCheck } from "./c/analyzeCodeForPlaintextPasswords";
 import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
-// import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
+ import { OtherVulnerabilitiesCheck } from "./c/checkOtherVulnerabilities";
  import { RandomNumberGenerationCheck } from "./c/checkRandomNumberGeneration";
  import { WeakHashingEncryptionCheck } from "./c/analyzeCodeForWeakHashingAndEncryption";
  import { InfiniteLoopCheck } from "./c/checkInfiniteLoopsOrExcessiveResourceConsumption";
@@ -22,12 +22,12 @@ import { RaceConditionCheck } from "./c/checkRaceConditionVulnerabilities";
 
 // Create an array of all security checks
 const securityChecks: SecurityCheck[] = [
-    // new BufferOverflowCheck(),
+     new BufferOverflowCheck(),
      new FloatingInMemoryCheck(),
-    // new HeapOverflowCheck(),
+     new HeapOverflowCheck(),
     new PlaintextPasswordCheck(),
      new RaceConditionCheck(),
-    // new OtherVulnerabilitiesCheck(),
+     new OtherVulnerabilitiesCheck(),
      new RandomNumberGenerationCheck(),
      new WeakHashingEncryptionCheck(),
      new InfiniteLoopCheck(),
