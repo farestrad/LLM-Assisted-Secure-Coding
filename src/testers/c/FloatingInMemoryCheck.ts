@@ -16,6 +16,7 @@ export class FloatingInMemoryCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         
+        
         // Data structures for tracking variables
         const heapAllocations = new Map<string, {
             allocator: string,
@@ -168,6 +169,49 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                     }
                 }
             }
+            if (node.type === 'declaration') {
+                for (const child of node.namedChildren) {
+                    if (child.type === 'init_declarator') {
+                        const pointerDecl = child.childForFieldName('declarator');
+                        const value = child.childForFieldName('value');
+                        let identifierNode: Parser.SyntaxNode | null = null;
+            
+                        if (pointerDecl?.type === 'pointer_declarator') {
+                            identifierNode = pointerDecl.namedChild(0); // ← extract identifier
+                        } else if (pointerDecl?.type === 'identifier') {
+                            identifierNode = pointerDecl;
+                        }
+            
+                        if (identifierNode?.type === 'identifier' && value?.type === 'call_expression') {
+                            const varName = identifierNode.text;
+                            const fnName = value.child(0)?.text;
+                            const args = value.child(1)?.namedChildren || [];
+                            const line = getLineNumber(child);
+            
+                            if (heapAllocators.includes(fnName || '')) {
+                                let sizeExpr = null;
+                                if (fnName === 'malloc' && args.length >= 1) {
+                                    sizeExpr = args[0].text;
+                                } else if (fnName === 'calloc' && args.length >= 2) {
+                                    sizeExpr = `${args[0].text} * ${args[1].text}`;
+                                }
+            
+                                console.log(`✅ Tracked heap allocation: ${varName} at line ${line}`);
+                                heapAllocations.set(varName, {
+                                    allocator: fnName || 'unknown',
+                                    line,
+                                    freed: false,
+                                    size: sizeExpr,
+                                    scope: currentScope.level
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            
+            
             
             // Track free operations
             if (node.type === 'call_expression') {
@@ -204,13 +248,20 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                             }
                         } else {
                             // Freeing a non-allocated pointer or something we don't track
+                            const isAliased = Array.from(aliases.values()).includes(originalVar);
+                            if (!isAliased) {
                             issues.push(
                                 `Warning: Freeing non-allocated or invalid pointer "${varName}" at line ${line} in method "${methodName}".`
                             );
                         }
                     }
                 }
+            }
+
+            
                 
+
+
                 // Track memory access operations that could cause use-after-free
                 if (accessOperations.includes(fnName || '')) {
                     // Check if any arguments are heap-allocated variables
@@ -325,6 +376,8 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                 }
             }
         });
+        console.log(tree.rootNode.toString());
+
         
         return issues;
     }

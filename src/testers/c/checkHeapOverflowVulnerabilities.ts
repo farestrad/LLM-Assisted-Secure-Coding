@@ -555,16 +555,6 @@ export class HeapOverflowCheck implements SecurityCheck {
         // Start traversal
         traverse(tree.rootNode);
         
-        // Post-processing checks
-        
-        // 1. Check for memory leaks (allocated but not freed)
-        heapAllocations.forEach((details, varName) => {
-            if (!details.freed) {
-                issues.push(
-                    `Warning: Memory leak detected at line ${details.line} in method "${methodName}". Heap-allocated buffer "${varName}" is never freed.`
-                );
-            }
-        });
         
 
         
