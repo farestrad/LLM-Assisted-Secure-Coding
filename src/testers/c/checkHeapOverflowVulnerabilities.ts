@@ -215,15 +215,7 @@ export class HeapOverflowCheck implements SecurityCheck {
                                         }
                                     }
                                     
-                                    // Check for missing validation
-                                    const parent = valueNode.parent;
-                                    const nextSibling = parent?.nextSibling;
-                                    if (nextSibling?.type !== 'if_statement' || 
-                                        !nextSibling.text.includes(name)) {
-                                        issues.push(
-                                            `Warning: Unchecked heap allocation result at line ${line} in method "${methodName}". Always check for NULL returns from memory allocation functions.`
-                                        );
-                                    }
+                                    
                                 }
                             }
                         }
@@ -297,14 +289,8 @@ export class HeapOverflowCheck implements SecurityCheck {
                                     }
                                 }
                                 
-                                // Check for missing validation
-                                const nextSibling = node.nextSibling;
-                                if (nextSibling?.type !== 'if_statement' || 
-                                    !nextSibling.text.includes(varName)) {
-                                    issues.push(
-                                        `Warning: Unchecked heap allocation result at line ${line} in method "${methodName}". Always check for NULL returns from memory allocation functions.`
-                                    );
-                                }
+                                
+                                
                             }
                         }
                         
@@ -447,10 +433,6 @@ export class HeapOverflowCheck implements SecurityCheck {
                                     allocation.freed = true;
                                     heapAllocations.set(resolvedPtr, allocation);
                                 }
-                            } else {
-                                issues.push(
-                                    `Warning: Freeing untracked or potentially invalid pointer "${ptrName}" at line ${line} in method "${methodName}". Ensure it's a valid heap allocation.`
-                                  );
                                   
                             }
                         }
