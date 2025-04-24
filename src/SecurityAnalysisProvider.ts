@@ -472,6 +472,140 @@ export function prioritizeCWEs(checkName: string, detectedIssues: string[] = [])
       
       return Array.from(prioritizedCWEs);
     },
+
+
+    'RandomNumberGenerationCheck': (issues, allCWEs) => {
+  const prioritizedCWEs = new Set<number>();
+  let hasInsecureRNG = false;
+  let hasWeakSeed = false;
+  
+  issues.forEach(issue => {
+    if (issue.includes('rand') || issue.includes('random')) {
+      hasInsecureRNG = true;
+    }
+    if (issue.includes('seed') || issue.includes('time(NULL)')) {
+      hasWeakSeed = true;
+    }
+  });
+  
+  if (hasWeakSeed) {
+    prioritizedCWEs.add(330); // Use of Insufficiently Random Values
+  } else if (hasInsecureRNG) {
+    prioritizedCWEs.add(338); // Use of Cryptographically Weak PRNG
+  }
+  
+  return prioritizedCWEs.size > 0 ? Array.from(prioritizedCWEs) : [allCWEs[0]];
+},
+
+'IntegerFlowCheck': (issues, allCWEs) => {
+  const prioritizedCWEs = new Set<number>();
+  let hasOverflow = false;
+  let hasUnderflow = false;
+  let hasBufferRelated = false;
+  
+  issues.forEach(issue => {
+    if (issue.includes('overflow')) {
+      hasOverflow = true;
+    }
+    if (issue.includes('underflow')) {
+      hasUnderflow = true;
+    }
+    if (issue.includes('buffer') || issue.includes('allocation')) {
+      hasBufferRelated = true;
+    }
+  });
+  
+  if (hasOverflow) {
+    prioritizedCWEs.add(190); // Integer Overflow or Wraparound
+  }
+  if (hasUnderflow) {
+    prioritizedCWEs.add(191); // Integer Underflow
+  }
+  if (hasBufferRelated && hasOverflow) {
+    prioritizedCWEs.add(680); // Integer Overflow to Buffer Overflow
+  }
+  
+  return prioritizedCWEs.size > 0 ? Array.from(prioritizedCWEs) : [allCWEs[0]];
+},
+
+'PlaintextPasswordCheck': (issues, allCWEs) => {
+  const prioritizedCWEs = new Set<number>();
+  let hasStorage = false;
+  let hasTransmission = false;
+  
+  issues.forEach(issue => {
+    if (issue.includes('storage') || issue.includes('stored')) {
+      hasStorage = true;
+    }
+    if (issue.includes('transmission') || issue.includes('transmitted')) {
+      hasTransmission = true;
+    }
+  });
+  
+  if (hasStorage) {
+    prioritizedCWEs.add(256); // Plaintext Storage of a Password
+  }
+  if (hasTransmission) {
+    prioritizedCWEs.add(319); // Cleartext Transmission of Sensitive Information
+  }
+  
+  return prioritizedCWEs.size > 0 ? Array.from(prioritizedCWEs) : [256]; // Default to storage
+},
+
+'InfiniteLoopCheck': (issues, allCWEs) => {
+  const prioritizedCWEs = new Set<number>();
+  let hasResourceConsumption = false;
+  let hasInfiniteLoop = false;
+  
+  issues.forEach(issue => {
+    if (issue.includes('resource') || issue.includes('memory') || issue.includes('consumption')) {
+      hasResourceConsumption = true;
+    }
+    if (issue.includes('infinite') || issue.includes('unreachable exit')) {
+      hasInfiniteLoop = true;
+    }
+  });
+  
+  if (hasResourceConsumption) {
+    prioritizedCWEs.add(400); // Uncontrolled Resource Consumption
+  }
+  if (hasInfiniteLoop) {
+    prioritizedCWEs.add(835); // Loop with Unreachable Exit Condition
+  }
+  
+  return prioritizedCWEs.size > 0 ? Array.from(prioritizedCWEs) : [835]; // Default to infinite loop
+},
+
+'FloatingInMemoryCheck': (issues, allCWEs) => {
+  const prioritizedCWEs = new Set<number>();
+  let hasUseAfterFree = false;
+  let hasDoubleFree = false;
+  let hasNullPointer = false;
+  
+  issues.forEach(issue => {
+    if (issue.includes('use after free') || issue.includes('use-after-free')) {
+      hasUseAfterFree = true;
+    }
+    if (issue.includes('double free')) {
+      hasDoubleFree = true;
+    }
+    if (issue.includes('NULL pointer') || issue.includes('null pointer')) {
+      hasNullPointer = true;
+    }
+  });
+  
+  if (hasUseAfterFree) {
+    prioritizedCWEs.add(416); // Use After Free
+  }
+  if (hasDoubleFree) {
+    prioritizedCWEs.add(415); // Double Free
+  }
+  if (hasNullPointer) {
+    prioritizedCWEs.add(476); // NULL Pointer Dereference
+  }
+  
+  return prioritizedCWEs.size > 0 ? Array.from(prioritizedCWEs) : [416]; // Default to use after free
+    },
     
     // For injection issues
     'OtherVulnerabilitiesCheck': (issues, allCWEs) => {
@@ -522,6 +656,8 @@ export function prioritizeCWEs(checkName: string, detectedIssues: string[] = [])
     return prioritizeCWEs(checkName, issues);
   }
 
+
+  
 
 
 
