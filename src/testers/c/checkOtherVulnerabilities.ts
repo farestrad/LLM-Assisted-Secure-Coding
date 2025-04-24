@@ -33,13 +33,10 @@ export class OtherVulnerabilitiesCheck implements SecurityCheck {
         
         // Weak crypto algorithms
         const weakCryptoAlgorithms = config.get<string[]>('weakCryptoAlgorithms', [
-            'MD5', 'md5', 'SHA1', 'sha1', 'DES', 'des', 'RC4', 'rc4', 'RC2', 'rc2'
+            'DES', 'des', 'RC4', 'rc4', 'RC2', 'rc2'
         ]);
         
-        // Input validation functions
-        const improperInputFunctions = config.get<string[]>('improperInputFunctions', [
-            'gets', 'scanf', 'fscanf', 'vscanf', 'vfscanf', 'sscanf', 'vsscanf', 'atoi', 'atol', 'atof'
-        ]);
+       
         
         // Privilege management functions
         const improperPrivilegeFunctions = config.get<string[]>('improperPrivilegeFunctions', [
@@ -180,10 +177,7 @@ export class OtherVulnerabilitiesCheck implements SecurityCheck {
                             }
                         }
                         
-                        // Track untrusted input variables
-                        if (improperInputFunctions.some(fn => value.includes(fn))) {
-                            untrustedInputVars.add(name);
-                        }
+                        
                     }
                     break;
                 }
@@ -221,19 +215,7 @@ export class OtherVulnerabilitiesCheck implements SecurityCheck {
                                 );
                             }
                         }
-                        
-                        // 2. Improper Input Validation Check
-                        if (improperInputFunctions.includes(fnName)) {
-                            issues.push(
-                                `Warning: Improper input validation detected in call to "${fnName}" at line ${line} in method "${methodName}". Use safer alternatives with proper bounds checking.`
-                            );
-                            
-                            // If first arg is a variable, mark it as untrusted
-                            if (args.length > 0) {
-                                untrustedInputVars.add(args[0]);
-                            }
-                        }
-                        
+                      
                         // 3. Privilege Management Check
                         if (improperPrivilegeFunctions.includes(fnName)) {
                             // Check for risky privilege operations
