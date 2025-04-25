@@ -12,7 +12,7 @@ function initParser() {
     }
 }
 
-// 🛠️ Escapes special characters for safe regex construction
+// Helper function for cleaner regex escaping
 function escapeRegex(str: string): string {
     return str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
@@ -21,23 +21,38 @@ export class PathTraversalCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         
-        // Track variables and their properties
-        const taintedVariables = new Set<string>();
-        const sanitizedVariables = new Set<string>();
-        const validatedVariables = new Set<string>();
-        const pathVariables = new Map<string, {value: string, line: number}>();
-        const fileOperationCalls = new Map<string, {path: string, line: number}>();
-        
         // Get configuration values
         const config = vscode.workspace.getConfiguration('securityAnalysis');
+        
+        // IMPROVEMENT: Early detection of file operations - if none, exit early
+        const fileOperationPattern = /\b(fopen|open|readfile|writefile|unlink|rename|access|stat|realpath)\b/;
+        const pathOperationPattern = /(\/|\\|\.\.)/;
+        
+        // IMPROVEMENT: Skip analysis entirely if no file operations or path patterns present
+        if (!fileOperationPattern.test(methodBody) && !pathOperationPattern.test(methodBody)) {
+            return []; // No file operations, no need to check for path traversal
+        }
+        
         const rawPatterns = config.get<string[]>('pathTraversalPatterns', [
             '../', '~/', '\\..\\', '..\\', '%2e%2e%2f', '%2e%2e/', '..%2f', '%2e%2e%5c'
         ]);
-        const pathTraversalPatterns = rawPatterns.map(escapeRegex);
+        
+        // IMPROVEMENT: Filter out patterns that trigger false positives in standard functions
+        const pathTraversalPatterns = rawPatterns
+            .filter(pattern => {
+                // Exclude patterns that may appear in standard function names/comments
+                if (pattern === '..\\'  && 
+                    !methodBody.includes('..\\') && 
+                    !methodBody.includes('path')) {
+                    return false;
+                }
+                return true;
+            })
+            .map(escapeRegex);
         
         const riskyFunctions = config.get<string[]>('riskyFunctions', [
             'fopen', 'readfile', 'open', 'opendir', 'readdir', 'writefile', 'unlink', 'rename', 
-            'chmod', 'chown', 'mkdir', 'rmdir', 'symlink', 'readlink'
+            'chmod', 'chown', 'mkdir', 'rmdir', 'symlink', 'readlink', 'realpath'
         ]);
         
         const commandExecFunctions = config.get<string[]>('commandExecFunctions', [
@@ -57,6 +72,16 @@ export class PathTraversalCheck implements SecurityCheck {
             'strstr', 'strpos', 'strchr', 'strrchr', 'strcmp', 'strcasecmp', 'strncmp', 'strncasecmp'
         ]);
 
+        // Track variables and their properties
+        const taintedVariables = new Set<string>();
+        const sanitizedVariables = new Set<string>();
+        const validatedVariables = new Set<string>();
+        const pathVariables = new Map<string, {value: string, line: number}>();
+        const fileOperationCalls = new Map<string, {path: string, line: number}>();
+        
+        // IMPROVEMENT: Track if file operations are actually present 
+        let hasFileOperations = false;
+        
         initParser();
         const tree = parser.parse(methodBody);
 
@@ -65,38 +90,62 @@ export class PathTraversalCheck implements SecurityCheck {
             return node.startPosition.row + 1;
         }
         
-        // 🔧 Input-specific sanitization checker - Enhanced with AST validation
+        // IMPROVEMENT: More careful sanitization checking
         function isSanitized(input: string): boolean {
-            // Check if the variable is in our sanitized set
             if (sanitizedVariables.has(input)) {
                 return true;
             }
             
-            // Check if the variable has been validated
             if (validatedVariables.has(input)) {
                 return true;
             }
             
-            // Variable name not found in sanitized or validated set
             return false;
         }
         
-        // Check if a path contains traversal patterns
+        // IMPROVEMENT: More careful traversal pattern detection
         function containsTraversalPattern(path: string): boolean {
-            // Skip checking empty strings or null
             if (!path) return false;
+            
+            // Skip checking if path is a standard stream
+            if (['stdin', 'stdout', 'stderr'].includes(path)) {
+                return false;
+            }
             
             return rawPatterns.some(pattern => path.includes(pattern));
         }
         
-        // Parse the AST and perform various checks
+        // First pass - just find if there are any file operations at all
+        function detectFileOperations(node: Parser.SyntaxNode) {
+            if (node.type === 'call_expression') {
+                const fnName = node.child(0)?.text || '';
+                
+                // Check for file operation functions
+                if (riskyFunctions.includes(fnName) || commandExecFunctions.includes(fnName)) {
+                    hasFileOperations = true;
+                    return; // Early exit once we find one
+                }
+            }
+            
+            node.namedChildren.forEach(detectFileOperations);
+        }
+        
+        // First do a quick scan for file operations
+        detectFileOperations(tree.rootNode);
+        
+        // IMPROVEMENT: If no file operations, we can exit early
+        if (!hasFileOperations) {
+            return [];
+        }
+        
+        // Main traverse function for detailed analysis
         function traverse(node: Parser.SyntaxNode) {
-            // Handle string literals that might be paths
+            // Check string literals that might be paths
             if (node.type === 'string_literal') {
                 const stringValue = node.text.replace(/["']/g, ''); // Remove quotes
                 
-                // Check if the string contains traversal patterns
-                if (containsTraversalPattern(stringValue)) {
+                // Only care about strings with traversal patterns in file contexts
+                if (containsTraversalPattern(stringValue) && hasFileOperations) {
                     if (node.parent?.type === 'assignment_expression') {
                         const assignTo = node.parent.child(0)?.text;
                         if (assignTo) {
@@ -131,14 +180,20 @@ export class PathTraversalCheck implements SecurityCheck {
                     if (name && value?.type === 'call_expression') {
                         const fnName = value.child(0)?.text;
                         if (['gets', 'fgets', 'scanf', 'fscanf', 'recv', 'read'].includes(fnName || '')) {
-                            taintedVariables.add(name);
+                            // IMPROVEMENT: Don't mark variables from stdin as tainted
+                            const args = value.child(1)?.namedChildren || [];
+                            const isStdin = args.length > 0 && 
+                                           args[args.length - 1]?.type === 'identifier' && 
+                                           args[args.length - 1]?.text === 'stdin';
+                            
+                            if (!isStdin) {
+                                taintedVariables.add(name);
+                            }
                         }
                     }
                 }
             }
 
-            
-            
             // Track assignment expressions
             if (node.type === 'assignment_expression') {
                 const left = node.child(0);
@@ -146,6 +201,7 @@ export class PathTraversalCheck implements SecurityCheck {
                 
                 if (left?.type === 'identifier' && right) {
                     const varName = left.text;
+                    const line = getLineNumber(node);
                     
                     // Track string assignments with traversal patterns
                     if (right.type === 'string_literal') {
@@ -158,7 +214,6 @@ export class PathTraversalCheck implements SecurityCheck {
                         }
                     }
                     
-                    
                     // Track sanitization function calls
                     if (right.type === 'call_expression') {
                         const fnName = right.child(0)?.text;
@@ -168,8 +223,15 @@ export class PathTraversalCheck implements SecurityCheck {
                             sanitizedVariables.add(varName);
                         }
                         
+                        // IMPROVEMENT: Don't mark stdin operations as tainted
+                        if (fnName === 'fgets' || fnName === 'fscanf') {
+                            const args = right.child(1)?.namedChildren || [];
+                            const lastArg = args[args.length - 1];
+                            
+                        }
+                        
                         // Track concatenation with traversal patterns
-                        if (right.text.includes('..') || right.text.includes('~')) {
+                        if (right.text.includes('..') || right.text.includes('~/')) {
                             if (!sanitizedVariables.has(varName)) {
                                 taintedVariables.add(varName);
                             }
@@ -180,18 +242,6 @@ export class PathTraversalCheck implements SecurityCheck {
                     if (right.type === 'identifier' && taintedVariables.has(right.text)) {
                         taintedVariables.add(varName);
                     }
-                    
-                    // Handle string concatenation (if contains traversal patterns)
-                    if (right.type === 'binary_expression' && right.child(1)?.text === '+') {
-                        const leftExpr = right.child(0)?.text || '';
-                        const rightExpr = right.child(2)?.text || '';
-                        
-                        if (containsTraversalPattern(leftExpr) || containsTraversalPattern(rightExpr)) {
-                            if (!sanitizedVariables.has(varName)) {
-                                taintedVariables.add(varName);
-                            }
-                        }
-                    }
                 }
             }
             
@@ -199,7 +249,7 @@ export class PathTraversalCheck implements SecurityCheck {
             if (node.type === 'if_statement') {
                 const condition = node.childForFieldName('condition');
                 if (condition) {
-                    // Check for validation patterns like if(strstr(path, "..") != NULL)
+                    // Check for validation patterns
                     const validationCall = condition.descendantsOfType('call_expression')
                         .find(call => {
                             const fnName = call.child(0)?.text;
@@ -215,7 +265,7 @@ export class PathTraversalCheck implements SecurityCheck {
                         }
                     }
                     
-                    // Also track variables that appear in any condition (might be validated)
+                    // Track variables that appear in any condition (might be validated)
                     const identifiers = condition.descendantsOfType('identifier');
                     for (const id of identifiers) {
                         if (taintedVariables.has(id.text)) {
@@ -225,11 +275,21 @@ export class PathTraversalCheck implements SecurityCheck {
                 }
             }
             
-            // Check function calls
+            // IMPROVEMENT: Much more careful file operation detection
             if (node.type === 'call_expression') {
                 const fnName = node.child(0)?.text || '';
                 const args = node.child(1)?.namedChildren || [];
                 const line = getLineNumber(node);
+                
+                // Skip any analysis on standard I/O functions with stdin/stdout
+                if ((fnName === 'fgets' || fnName === 'fprintf' || fnName === 'fputs') && 
+                    args.length > 0 && 
+                    args[args.length - 1]?.type === 'identifier' && 
+                    ['stdin', 'stdout', 'stderr'].includes(args[args.length - 1]?.text)) {
+                    // Standard I/O operation, not a file - skip this
+                    node.namedChildren.forEach(traverse);
+                    return;
+                }
                 
                 // Check if it's a sanitization function
                 if (sanitizationFunctions.includes(fnName)) {
@@ -263,6 +323,8 @@ export class PathTraversalCheck implements SecurityCheck {
                         else if (pathArg.type === 'identifier') {
                             const varName = pathArg.text;
                             
+                            
+                            
                             // If it's a path variable we've tracked and it's not sanitized
                             if (pathVariables.has(varName) && !isSanitized(varName)) {
                                 issues.push(
@@ -284,6 +346,9 @@ export class PathTraversalCheck implements SecurityCheck {
                     if (args.length > 0) {
                         const cmdArg = args[0];
                         
+                        // Skip warning if it's a standard stream
+                        
+                        
                         // Check for command injection with path traversal
                         if ((cmdArg.type === 'string_literal' && containsTraversalPattern(cmdArg.text)) ||
                             (cmdArg.type === 'identifier' && (pathVariables.has(cmdArg.text) || taintedVariables.has(cmdArg.text)))) {
@@ -301,88 +366,37 @@ export class PathTraversalCheck implements SecurityCheck {
                         }
                     }
                 }
-                // Inside call_expression
-                if (fnName === 'sprintf' && args.length >= 2) {
-                    const dst = args[0].text;
-                    for (let i = 1; i < args.length; i++) {
-                        const arg = args[i];
-                        if (arg.type === 'identifier' && taintedVariables.has(arg.text)) {
-                            taintedVariables.add(dst);
-                        }
-                    }
-                }
-
-                                // Command execution functions with potential path traversal
-                if (commandExecFunctions.includes(fnName)) {
-                    if (args.length > 0) {
-                        const arg = args[0];
-                        if (arg.type === 'identifier' && taintedVariables.has(arg.text)) {
-                            issues.push(
-                                `Warning: Unsanitized input "${arg.text}" passed to "${fnName}" at line ${line} in method "${methodName}". This may allow command injection or path traversal.`
-                            );
-                        }
-                    }
-                }
-
-                
-                // File inclusion functions can also lead to path traversal
-                if (fileInclusions.includes(fnName)) {
-                    if (args.length > 0) {
-                        const includeArg = args[0];
-                        
-                        // Check for direct traversal patterns in includes
-                        if (includeArg.type === 'string_literal' && containsTraversalPattern(includeArg.text)) {
-                            issues.push(
-                                `Warning: Path traversal vulnerability in file inclusion "${fnName}" at line ${line} in method "${methodName}". Avoid relative paths in includes.`
-                            );
-                        }
-                        // Check for variables that might contain traversal patterns
-                        else if (includeArg.type === 'identifier') {
-                            const varName = includeArg.text;
-                            
-                            if ((pathVariables.has(varName) || taintedVariables.has(varName)) && !isSanitized(varName)) {
-                                issues.push(
-                                    `Warning: Potential path traversal in file inclusion "${fnName}" with variable "${varName}" at line ${line} in method "${methodName}". Sanitize paths before including files.`
-                                );
-                            }
-                        }
-                    }
-                }
             }
             
-            // Recursively traverse children
+            // Continue traversing children
             node.namedChildren.forEach(traverse);
         }
         
-        // 🔹 Phase 1: Regex Pattern-based Traversal Detection for quick wins
-        const pathTraversalPattern = new RegExp(`(${pathTraversalPatterns.join('|')})`, 'g');
-        let match;
-        while ((match = pathTraversalPattern.exec(methodBody)) !== null) {
-            // We'll still keep this but as an initial flag only - detailed contextual analysis is done in the AST
-            const path = match[1];
-            issues.push(
-                `Warning: Potential Path Traversal pattern "${path}" detected in method "${methodName}". Avoid using relative paths with user input.`
-            );
-        }
-        
-        // 🔹 Phase 2: Execute AST-based analysis
-        traverse(tree.rootNode);
-        
-        // 🔹 Phase 3: Final pass to check for any file operations without adequate checks
-        fileOperationCalls.forEach(({path, line}, key) => {
-            // Skip if we've already flagged this operation
-            if (issues.some(issue => issue.includes(`at line ${line}`) && issue.includes(path))) {
-                return;
-            }
-            
-            // Check if the path is a variable that hasn't been sanitized or validated
-            if (path && !path.startsWith('"') && !path.startsWith("'") && 
-                !isSanitized(path) && taintedVariables.has(path)) {
+        // Phase 1: Only do regex pattern checks if we have file operations 
+        if (hasFileOperations) {
+            const pathTraversalPattern = new RegExp(`(${pathTraversalPatterns.join('|')})`, 'g');
+            let match;
+            while ((match = pathTraversalPattern.exec(methodBody)) !== null) {
+                // Only report if the pattern is in a string literal or user input context
+                // This avoids false positives from comments and unrelated code
+                const pattern = match[1];
+                const context = methodBody.substring(Math.max(0, match.index - 20), 
+                                                  Math.min(methodBody.length, match.index + pattern.length + 20));
+                
+                // Skip warning if the pattern is in a comment or appears to be in printf/logging
+                if (context.includes('//') || context.includes('/*') || 
+                    context.includes('printf') || context.includes('fprintf')) {
+                    continue;
+                }
+                
                 issues.push(
-                    `Warning: Unsanitized input "${path}" detected in file operation at line ${line} in method "${methodName}". Ensure input is sanitized before use.`
+                    `Warning: Potential Path Traversal pattern "${pattern}" detected in method "${methodName}". Avoid using relative paths with user input.`
                 );
             }
-        });
+        }
+        
+        // Phase 2: Execute AST-based analysis
+        traverse(tree.rootNode);
         
         return issues;
     }

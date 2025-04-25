@@ -20,6 +20,21 @@ export class RaceConditionCheck implements SecurityCheck {
         const config = vscode.workspace.getConfiguration('securityAnalysis');
         const detectionLevel = config.get<string>('fileRaceDetectionLevel', 'moderate');
         
+        // Standard streams that are always safe from race conditions
+        const knownSafeDescriptors = ['stdin', 'stdout', 'stderr'];
+
+        // Helper: Check if a node refers to a standard stream
+        function isStandardStream(node: Parser.SyntaxNode | undefined | null): boolean {
+            if (!node) return false;
+    
+            // Direct standard stream identifier
+            if (node.type === 'identifier' && knownSafeDescriptors.includes(node.text)) {
+                return true;
+            }
+            
+            return false;
+        }
+        
         // Advanced tracking of file operations and context
         const context = {
             fileOperations: new Map<string, {node: Parser.SyntaxNode, operation: string, path?: string, fdVar?: string}>(),
@@ -34,7 +49,9 @@ export class RaceConditionCheck implements SecurityCheck {
             orphanedOperations: [] as {node: Parser.SyntaxNode, operation: string, fdVar?: string}[],
             // Track secure patterns
             hasBasenameSanitization: false,
-            hasSecureOpenFlags: false
+            hasSecureOpenFlags: false,
+            // Track stdin/stdout operations
+            standardStreamOperations: new Set<Parser.SyntaxNode>()
         };
         
         // Track filenames and their variables
@@ -96,6 +113,7 @@ export class RaceConditionCheck implements SecurityCheck {
         function formatLineInfo(node: Parser.SyntaxNode): string {
             return `line ${node.startPosition.row + 1}`;
         }
+        
         function getLineNumber(node: Parser.SyntaxNode): number {
             return node.startPosition.row + 1;
         }
@@ -118,6 +136,22 @@ export class RaceConditionCheck implements SecurityCheck {
         
         // Helper: Track file operation with both path and file descriptor
         function trackFileOperation(node: Parser.SyntaxNode, fnName: string, pathArg?: Parser.SyntaxNode, fdArg?: Parser.SyntaxNode): void {
+            // Skip tracking for standard streams - this is critical
+            if (fdArg && isStandardStream(fdArg)) {
+                context.standardStreamOperations.add(node);
+                return; // Skip processing for standard streams
+            }
+            
+            // Skip if the last arg is stdin for functions like fgets
+            const argsNode = node.child(1);
+            if (argsNode && argsNode.namedChildren.length > 0) {
+                const lastArg = argsNode.namedChildren[argsNode.namedChildren.length - 1];
+                if (isStandardStream(lastArg) && ['fgets', 'fscanf', 'fprintf', 'fputs'].includes(fnName)) {
+                    context.standardStreamOperations.add(node);
+                    return; // Skip processing for stdin/stdout operations
+                }
+            }
+            
             const path = pathArg ? extractPathArgument(pathArg) : undefined;
             const fdVar = fdArg?.type === 'identifier' ? fdArg.text : undefined;
             
@@ -193,7 +227,7 @@ export class RaceConditionCheck implements SecurityCheck {
             return atomicOperations.some(atomicFn => fnName.toLowerCase().includes(atomicFn.toLowerCase()));
         }
         
-        // IMPROVED: Helper to detect open() calls with secure flags
+        // Helper to detect open() calls with secure flags
         function hasSecureOpenFlags(node: Parser.SyntaxNode): boolean {
             if (node.type !== 'call_expression') return false;
             
@@ -209,7 +243,7 @@ export class RaceConditionCheck implements SecurityCheck {
             return secureOpenFlags.some(flag => flagsArg.includes(flag));
         }
         
-        // IMPROVED: Helper to detect basename sanitization
+        // Helper to detect basename sanitization
         function isBasenameOrPathnamePattern(methodBody: string): boolean {
             // Check for basename/dirname pattern
             const hasBasename = /basename\s*\([^)]+\)/.test(methodBody);
@@ -221,9 +255,9 @@ export class RaceConditionCheck implements SecurityCheck {
             return hasBasename || hasDirname || hasRealpath;
         }
         
-        // IMPROVED: Helper to detect safe file operation patterns, especially fopen/fprintf/fclose sequences
+        // Helper to detect safe file operation patterns, especially fopen/fprintf/fclose sequences
         function isSafeFileOperationPattern(): boolean {
-            // NEW: Check for path sanitization + secure opening pattern
+            // Check for path sanitization + secure opening pattern
             if (context.hasBasenameSanitization && context.hasSecureOpenFlags) {
                 return true;
             }
@@ -320,6 +354,16 @@ export class RaceConditionCheck implements SecurityCheck {
         initParser();
         const tree = parser.parse(methodBody);
         
+        // Check: Does the method only use standard streams?
+        const usesOnlyStandardStreams = 
+            /\bstdin\b|\bstdout\b|\bstderr\b/.test(methodBody) && 
+            !(/\bfopen\b|\bopen\b|\bcreat\b/.test(methodBody));
+
+        // Skip full analysis if we only use standard streams
+        if (usesOnlyStandardStreams) {
+            return []; // No race conditions with standard streams
+        }
+        
         // Pre-check: Scan for path sanitization and secure opening patterns
         context.hasBasenameSanitization = isBasenameOrPathnamePattern(methodBody);
         
@@ -351,7 +395,7 @@ export class RaceConditionCheck implements SecurityCheck {
                             }
                         }
                         
-                        // NEW: Check for secure open flags
+                        // Check for secure open flags
                         if (fnName === 'open' && argList && argList.namedChildren.length > 1) {
                             const flagsArg = argList.namedChildren[1];
                             if (flagsArg && secureOpenFlags.some(flag => flagsArg.text.includes(flag))) {
@@ -365,6 +409,20 @@ export class RaceConditionCheck implements SecurityCheck {
             // Check for callsite with secure flags
             if (node.type === 'call_expression') {
                 const fnName = node.child(0)?.text;
+                const argsNode = node.child(1);
+                
+                // Handle standard stream operations early
+                if (['fgets', 'fputs', 'fprintf', 'fscanf'].includes(fnName || '')) {
+                    // Check last argument for stdin/stdout/stderr
+                    if (argsNode && argsNode.namedChildren.length > 0) {
+                        const lastArg = argsNode.namedChildren[argsNode.namedChildren.length - 1];
+                        if (isStandardStream(lastArg)) {
+                            context.standardStreamOperations.add(node);
+                            return; // Skip further processing for this node
+                        }
+                    }
+                }
+                
                 if (fnName === 'open') {
                     const argList = node.child(1);
                     if (argList && argList.namedChildren.length > 1) {
@@ -415,7 +473,23 @@ export class RaceConditionCheck implements SecurityCheck {
                 const argsNode = node.child(1);
                 const line = getLineNumber(node);
                 
-                // NEW: Check for path sanitization functions
+                // Check if this is already marked as a standard stream operation
+                if (context.standardStreamOperations.has(node)) {
+                    return; // Skip operations on standard streams
+                }
+                
+                // Specially handle stdin/stdout operations 
+                if (['fgets', 'fprintf', 'fputs', 'fscanf'].includes(fnName)) {
+                    if (argsNode && argsNode.namedChildren.length > 0) {
+                        const lastArg = argsNode.namedChildren[argsNode.namedChildren.length - 1];
+                        if (isStandardStream(lastArg)) {
+                            context.standardStreamOperations.add(node);
+                            return; // Skip standard stream operations
+                        }
+                    }
+                }
+                
+                // Check for path sanitization functions
                 if (pathSanitizers.includes(fnName)) {
                     context.hasBasenameSanitization = true;
                 }
@@ -428,7 +502,7 @@ export class RaceConditionCheck implements SecurityCheck {
                         const pathArg = argsNode?.namedChildren[0];
                         trackFileOperation(node, fnName, pathArg);
                         
-                        // NEW: Check for secure open flags
+                        // Check for secure open flags
                         if (fnName === 'open' && argsNode && argsNode.namedChildren.length > 1) {
                             const flagsArg = argsNode.namedChildren[1];
                             if (flagsArg && secureOpenFlags.some(flag => flagsArg.text.includes(flag))) {
@@ -451,18 +525,37 @@ export class RaceConditionCheck implements SecurityCheck {
                     
                     // Only warn if conditions are met and we're not using a recognized safe pattern
                     if (!context.synchronizedContext) {
+                        // Skip standard stream operations for warnings
+                        if (context.standardStreamOperations.has(node)) {
+                            return; // Skip standard stream operations 
+                        }
+                        
                         // Run the check for safe patterns AFTER we've tracked this operation
                         const isPartOfSafePattern = isSafeFileOperationPattern();
                         
-                        // NEW: Additional check for basename + secure flags pattern
+                        // Additional check for basename + secure flags pattern
                         const hasSecurePattern = (context.hasBasenameSanitization && context.hasSecureOpenFlags);
                         
                         // Only warn if detection level and pattern analysis justifies it
                         if (detectionLevel === 'strict' || 
                            (detectionLevel === 'moderate' && !isPartOfSafePattern && !hasSecurePattern)) {
-                            issues.push(
-                                `Warning: Unprotected file operation "${fnName}" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking.`
-                            );
+                            
+                            // Final check for standard streams before issuing warning
+                            let isStdioOperation = false;
+                            if (argsNode && argsNode.namedChildren.length > 0) {
+                                for (const arg of argsNode.namedChildren) {
+                                    if (isStandardStream(arg)) {
+                                        isStdioOperation = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            if (!isStdioOperation) {
+                                issues.push(
+                                    `Warning: Unprotected file operation "${fnName}" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking.`
+                                );
+                            }
                         }
                     }
                 }
@@ -562,14 +655,21 @@ export class RaceConditionCheck implements SecurityCheck {
             const isPartOfSafePattern = isSafeFileOperationPattern();
             const hasSecurePattern = (context.hasBasenameSanitization && context.hasSecureOpenFlags);
             
-            // NEW: Check for method name safety patterns
+            // Check for method name safety patterns
             const isSecureFunctionName = methodName.includes('safe') || 
                                          methodName.includes('secure') || 
                                          methodName.includes('atomic');
             
+            // Special case: does this method only use standard streams?
+            const onlyStandardStreams = context.standardStreamOperations.size > 0 && 
+                                       context.fileOperations.size === 0;
+            
             // Only add general warning if needed based on detection level and safe pattern analysis
             if ((detectionLevel === 'strict' || 
-                (detectionLevel === 'moderate' && !isPartOfSafePattern && !hasSecurePattern && !isSecureFunctionName)) && 
+                (detectionLevel === 'moderate' && !isPartOfSafePattern && 
+                                               !hasSecurePattern && 
+                                               !isSecureFunctionName && 
+                                               !onlyStandardStreams)) && 
                 !issues.some(msg => msg.includes('Unprotected'))) {
                 
                 issues.push(
@@ -606,6 +706,11 @@ export class RaceConditionCheck implements SecurityCheck {
             if (context.hasBasenameSanitization || context.hasSecureOpenFlags) {
                 return [];
             }
+        }
+        
+        // Special case: if the method only uses stdin/stdout (no actual files)
+        if (context.standardStreamOperations.size > 0 && context.fileOperations.size === 0) {
+            return []; // No race conditions with standard streams
         }
 
         return issues;
