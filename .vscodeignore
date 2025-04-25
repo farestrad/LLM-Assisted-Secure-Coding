@@ -2,11 +2,6 @@
 .vscode/**
 .vscode-test/**
 
-# Source files and sourcemaps
-src/**
-**/*.ts
-**/*.map
-
 # Tests and coverage
 out/test/**
 out/__mocks__/**
