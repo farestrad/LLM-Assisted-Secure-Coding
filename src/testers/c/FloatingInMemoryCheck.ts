@@ -16,7 +16,6 @@ export class FloatingInMemoryCheck implements SecurityCheck {
     check(methodBody: string, methodName: string): string[] {
         const issues: string[] = [];
         
-        
         // Data structures for tracking variables
         const heapAllocations = new Map<string, {
             allocator: string,
@@ -33,6 +32,9 @@ export class FloatingInMemoryCheck implements SecurityCheck {
         const doubleFreePotential = new Set<string>(); // variables with potential double free
         const currentScope = { level: 0 };
         
+        // NEW: Track functions that return heap-allocated memory
+        const heapReturningFunctions = new Set<string>();
+        
         // Get configuration values
         const config = vscode.workspace.getConfiguration('securityAnalysis');
         const heapAllocators = config.get<string[]>('heapAllocators', [
@@ -44,6 +46,11 @@ export class FloatingInMemoryCheck implements SecurityCheck {
         const accessOperations = config.get<string[]>('accessOperations', [
             'memcpy', 'strcpy', 'strcat', 'sprintf', 'read', 'write'
         ]);
+        
+        // NEW: Keywords that suggest a function is returning heap memory
+        const heapFunctionIndicators = [
+            'alloc', 'create', 'new', 'dup', 'copy', 'clone', 'strdup', 'strndup'
+        ];
         
         initParser();
         const tree = parser.parse(methodBody);
@@ -65,6 +72,69 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                 variableUses.get(original)?.push(line);
             } else {
                 variableUses.set(original, [line]);
+            }
+        }
+        
+        // NEW: Helper to check if a function likely returns heap memory
+        function isLikelyHeapReturningFunction(functionName: string): boolean {
+            // Known heap-returning functions
+            if (heapReturningFunctions.has(functionName)) {
+                return true;
+            }
+            
+            // Check for function name patterns that suggest heap allocation
+            for (const indicator of heapFunctionIndicators) {
+                if (functionName.toLowerCase().includes(indicator)) {
+                    return true;
+                }
+            }
+            
+            // Common function names that return heap memory
+            return functionName.includes('read_line') || 
+                   functionName.includes('getline') ||
+                   functionName.includes('makeString') ||
+                   functionName.includes('createBuffer');
+        }
+        
+        // NEW: First pass - identify functions that return heap-allocated memory
+        function identifyHeapReturningFunctions(node: Parser.SyntaxNode) {
+            if (node.type === 'function_definition') {
+                const name = node.childForFieldName('declarator')?.descendantsOfType('identifier')?.[0]?.text;
+                
+                if (name) {
+                    // Look for return statements that return heap-allocated memory
+                    const returnNodes = node.descendantsOfType('return_statement');
+                    let returnsHeapMemory = false;
+                    
+                    for (const returnNode of returnNodes) {
+                        const returnExpr = returnNode.child(1);
+                        
+                        // Check if returning a variable that might be heap-allocated
+                        if (returnExpr?.type === 'identifier' && heapAllocations.has(returnExpr.text)) {
+                            returnsHeapMemory = true;
+                            break;
+                        }
+                        
+                        // Check if returning the result of a heap allocation function directly
+                        if (returnExpr?.type === 'call_expression') {
+                            const fnName = returnExpr.child(0)?.text;
+                            if (heapAllocators.includes(fnName || '')) {
+                                returnsHeapMemory = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Also check if function name suggests heap allocation
+                    if (returnsHeapMemory || isLikelyHeapReturningFunction(name)) {
+                        heapReturningFunctions.add(name);
+                    }
+                }
+            }
+            
+            // Recursively check all nodes
+            for (const child of node.namedChildren) {
+                identifyHeapReturningFunctions(child);
             }
         }
         
@@ -135,13 +205,13 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                         }
                     }
                     
-                    // Track allocation operations
+                    // NEW: Track function calls that return heap-allocated memory
                     if (right.type === 'call_expression') {
-                        const fnName = right.child(0)?.text;
+                        const fnName = right.child(0)?.text || '';
                         const args = right.child(1)?.namedChildren || [];
                         
                         // Check if it's a heap allocation function
-                        if (heapAllocators.includes(fnName || '')) {
+                        if (heapAllocators.includes(fnName)) {
                             // Extract size expression if possible
                             let sizeExpr = null;
                             if (fnName === 'malloc' && args.length >= 1) {
@@ -159,16 +229,29 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                             
                             // Record this heap allocation
                             heapAllocations.set(varName, {
-                                allocator: fnName || 'unknown',
+                                allocator: fnName,
                                 line,
                                 freed: false,
                                 size: sizeExpr,
                                 scope: currentScope.level
                             });
                         }
+                        // Check if it's a function that returns heap-allocated memory
+                        else if (isLikelyHeapReturningFunction(fnName) || heapReturningFunctions.has(fnName)) {
+                            // Record this as a heap allocation
+                            heapAllocations.set(varName, {
+                                allocator: 'function_return',
+                                line,
+                                freed: false,
+                                size: null,
+                                scope: currentScope.level
+                            });
+                        }
                     }
                 }
             }
+            
+            // Track declaration with initialization
             if (node.type === 'declaration') {
                 for (const child of node.namedChildren) {
                     if (child.type === 'init_declarator') {
@@ -177,18 +260,19 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                         let identifierNode: Parser.SyntaxNode | null = null;
             
                         if (pointerDecl?.type === 'pointer_declarator') {
-                            identifierNode = pointerDecl.namedChild(0); // ← extract identifier
+                            identifierNode = pointerDecl.namedChild(0);
                         } else if (pointerDecl?.type === 'identifier') {
                             identifierNode = pointerDecl;
                         }
             
                         if (identifierNode?.type === 'identifier' && value?.type === 'call_expression') {
                             const varName = identifierNode.text;
-                            const fnName = value.child(0)?.text;
+                            const fnName = value.child(0)?.text || '';
                             const args = value.child(1)?.namedChildren || [];
                             const line = getLineNumber(child);
             
-                            if (heapAllocators.includes(fnName || '')) {
+                            // Check if it's a heap allocation function
+                            if (heapAllocators.includes(fnName)) {
                                 let sizeExpr = null;
                                 if (fnName === 'malloc' && args.length >= 1) {
                                     sizeExpr = args[0].text;
@@ -196,12 +280,21 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                                     sizeExpr = `${args[0].text} * ${args[1].text}`;
                                 }
             
-                                console.log(`✅ Tracked heap allocation: ${varName} at line ${line}`);
                                 heapAllocations.set(varName, {
-                                    allocator: fnName || 'unknown',
+                                    allocator: fnName,
                                     line,
                                     freed: false,
                                     size: sizeExpr,
+                                    scope: currentScope.level
+                                });
+                            }
+                            // NEW: Check if it's a function that returns heap-allocated memory
+                            else if (isLikelyHeapReturningFunction(fnName) || heapReturningFunctions.has(fnName)) {
+                                heapAllocations.set(varName, {
+                                    allocator: 'function_return',
+                                    line,
+                                    freed: false,
+                                    size: null,
                                     scope: currentScope.level
                                 });
                             }
@@ -210,17 +303,14 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                 }
             }
             
-            
-            
-            
             // Track free operations
             if (node.type === 'call_expression') {
-                const fnName = node.child(0)?.text;
+                const fnName = node.child(0)?.text || '';
                 const args = node.child(1)?.namedChildren || [];
                 const line = getLineNumber(node);
                 
                 // Check if it's a memory free function
-                if (freeOperators.includes(fnName || '') && args.length > 0) {
+                if (freeOperators.includes(fnName) && args.length > 0) {
                     const arg = args[0];
                     
                     if (arg.type === 'identifier') {
@@ -250,20 +340,26 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                             // Freeing a non-allocated pointer or something we don't track
                             const isAliased = Array.from(aliases.values()).includes(originalVar);
                             if (!isAliased) {
-                            issues.push(
-                                `Warning: Freeing non-allocated or invalid pointer "${varName}" at line ${line} in method "${methodName}".`
-                            );
+                                // NEW: Only warn if this isn't in a false positive pattern
+                                // Don't warn if this is a parameter that's being freed
+                                const isParameter = false; // TODO: Implement parameter detection
+                                
+                                // Don't warn if this might be from a function that returns heap memory
+                                // but we missed detecting it
+                                const possiblyFromHeapFunction = !isParameter && /read|get|create|make|alloc/.test(methodBody);
+                                
+                                if (!possiblyFromHeapFunction) {
+                                    issues.push(
+                                        `Warning: Freeing non-allocated or invalid pointer "${varName}" at line ${line} in method "${methodName}".`
+                                    );
+                                }
+                            }
                         }
                     }
                 }
-            }
-
-            
-                
-
 
                 // Track memory access operations that could cause use-after-free
-                if (accessOperations.includes(fnName || '')) {
+                if (accessOperations.includes(fnName)) {
                     // Check if any arguments are heap-allocated variables
                     args.forEach(arg => {
                         if (arg.type === 'identifier') {
@@ -321,7 +417,10 @@ export class FloatingInMemoryCheck implements SecurityCheck {
             node.namedChildren.forEach(child => traverse(child));
         }
         
-        // Start traversal
+        // FIRST: Perform a quick analysis to find functions that return heap memory
+        identifyHeapReturningFunctions(tree.rootNode);
+        
+        // SECOND: Perform the main analysis to find memory errors
         traverse(tree.rootNode);
         
         // Post-processing to detect issues
@@ -376,8 +475,6 @@ export class FloatingInMemoryCheck implements SecurityCheck {
                 }
             }
         });
-        console.log(tree.rootNode.toString());
-
         
         return issues;
     }

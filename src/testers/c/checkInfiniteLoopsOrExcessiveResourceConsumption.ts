@@ -21,11 +21,18 @@ export class InfiniteLoopCheck implements SecurityCheck {
         const detectionLevel = config.get<string>('infiniteLoopDetectionLevel', 'moderate');
         const memoryThreshold = config.get<number>('excessiveMemoryThreshold', 1024 * 1024); // Default: 1MB
         
+        // Known C constants to exclude from variable checks
+        const knownConstants = new Set([
+            'NULL', 'EOF', 'SEEK_SET', 'SEEK_CUR', 'SEEK_END',
+            'true', 'false', 'TRUE', 'FALSE'
+        ]);
+        
         // Context tracking for better analysis
         const context = {
             loopContexts: new Map<string, {
                 node: Parser.SyntaxNode,
                 variables: Set<string>,
+                controlVariables: Set<string>, // NEW: Explicitly track loop control variables
                 modifiedVars: Set<string>,
                 hasBreak: boolean,
                 hasReturn: boolean,
@@ -42,8 +49,6 @@ export class InfiniteLoopCheck implements SecurityCheck {
             flaggedLoops: new Set<string>()
         };
         
-        // Enhanced helper functions
-        
         // Generate unique node ID
         function nodeKey(node: Parser.SyntaxNode): string {
             return `${node.type}-${node.startPosition.row}:${node.startPosition.column}`;
@@ -54,22 +59,106 @@ export class InfiniteLoopCheck implements SecurityCheck {
             return `line ${node.startPosition.row + 1}`;
         }
         
-        // Extract all variables from a condition expression
-        function extractVariablesFromCondition(conditionNode: Parser.SyntaxNode | null): Set<string> {
+        // NEW: Check if a node is a function call
+        function isFunctionCall(node: Parser.SyntaxNode): boolean {
+            return node.type === 'call_expression';
+        }
+        
+        // NEW: Check if a string is a known constant
+        function isConstant(name: string): boolean {
+            return knownConstants.has(name) || /^[A-Z][A-Z0-9_]*$/.test(name);
+        }
+        
+        // NEW: Improved variable extraction from condition expressions
+        function extractVariablesFromCondition(conditionNode: Parser.SyntaxNode | null): {
+            variables: Set<string>,
+            controlVariables: Set<string> // Variables that control the loop
+        } {
             const variables = new Set<string>();
+            const controlVariables = new Set<string>();
             
-            if (!conditionNode) return variables;
+            if (!conditionNode) return { variables, controlVariables };
+            
+            // Helper to determine if a variable is likely a loop control variable
+            function isLikelyControlVariable(node: Parser.SyntaxNode, varName: string): boolean {
+                // If parent is a binary expression like "i < 10", then i is a control variable
+                if (node.parent?.type === 'binary_expression') {
+                    const binExpr = node.parent;
+                    const operator = binExpr.child(1)?.text;
+                    
+                    // Comparison operators suggest this is a control variable
+                    if (['<', '>', '<=', '>=', '==', '!='].includes(operator || '')) {
+                        // The variable being compared is likely a control variable
+                        if (binExpr.child(0) === node) {
+                            return true;
+                        }
+                    }
+                }
+                
+                return false;
+            }
             
             function collectIdentifiers(node: Parser.SyntaxNode) {
+                // Skip function calls - don't count their names as variables
+                if (isFunctionCall(node)) {
+                    // Only process arguments, not the function name
+                    const args = node.child(1);
+                    if (args) {
+                        args.children.forEach(collectIdentifiers);
+                    }
+                    return;
+                }
+                
                 if (node.type === 'identifier') {
-                    variables.add(node.text);
+                    const varName = node.text;
+                    
+                    // Skip constants and standard library functions
+                    if (isConstant(varName) || 
+                        ['getchar', 'fgetc', 'getc', 'scanf', 'fscanf'].includes(varName)) {
+                        return;
+                    }
+                    
+                    variables.add(varName);
+                    
+                    // Check if this is likely a control variable
+                    if (isLikelyControlVariable(node, varName)) {
+                        controlVariables.add(varName);
+                    }
                 }
                 
                 node.children.forEach(collectIdentifiers);
             }
             
             collectIdentifiers(conditionNode);
-            return variables;
+            
+            // For for-loops, extract the loop control variable from initializer
+            if (conditionNode.parent?.type === 'for_statement') {
+                const forStatement = conditionNode.parent;
+                const initializer = forStatement.childForFieldName('initializer');
+                
+                if (initializer) {
+                    if (initializer.type === 'declaration') {
+                        // e.g., for (int i = 0; ...)
+                        const declarators = initializer.descendantsOfType('init_declarator');
+                        for (const decl of declarators) {
+                            const nameNode = decl.childForFieldName('declarator');
+                            if (nameNode) {
+                                const controlVar = nameNode.text;
+                                controlVariables.add(controlVar);
+                            }
+                        }
+                    } else if (initializer.type === 'assignment_expression') {
+                        // e.g., for (i = 0; ...)
+                        const lhs = initializer.child(0);
+                        if (lhs && lhs.type === 'identifier') {
+                            const controlVar = lhs.text;
+                            controlVariables.add(controlVar);
+                        }
+                    }
+                }
+            }
+            
+            return { variables, controlVariables };
         }
         
         // Check if a loop contains any termination statements
@@ -130,7 +219,7 @@ export class InfiniteLoopCheck implements SecurityCheck {
             return result;
         }
         
-        // Track variables modified in a block
+        // Improved tracking of modified variables in a block
         function trackModifiedVariables(node: Parser.SyntaxNode, targetVars: Set<string>): Set<string> {
             const modifiedVars = new Set<string>();
             
@@ -278,6 +367,7 @@ export class InfiniteLoopCheck implements SecurityCheck {
             return excessiveAllocation;
         }
         
+        // NEW: Improved check for always-true conditions
         function isAlwaysTrueCondition(conditionNode: Parser.SyntaxNode | null): boolean {
             if (!conditionNode) return true;
         
@@ -312,10 +402,36 @@ export class InfiniteLoopCheck implements SecurityCheck {
                     if (op === '>=' && l >= r) return true;
                 }
             }
+            
+            // NEW: Check for while(1), while(true), etc.
+            if (conditionNode.type === 'identifier') {
+                return conditionNode.text === 'true' || conditionNode.text === 'TRUE';
+            }
         
             return false;
         }
         
+        // NEW: Check if the condition includes function calls that might change its value
+        function conditionHasFunctionCalls(conditionNode: Parser.SyntaxNode | null): boolean {
+            if (!conditionNode) return false;
+            
+            let hasFunctionCall = false;
+            
+            function checkForCalls(node: Parser.SyntaxNode) {
+                if (node.type === 'call_expression') {
+                    hasFunctionCall = true;
+                    return; // Stop traversal once found
+                }
+                
+                // Continue checking children if no call found yet
+                if (!hasFunctionCall) {
+                    node.children.forEach(checkForCalls);
+                }
+            }
+            
+            checkForCalls(conditionNode);
+            return hasFunctionCall;
+        }
         
         // Process the AST to find loops and other relevant nodes
         initParser();
@@ -348,7 +464,7 @@ export class InfiniteLoopCheck implements SecurityCheck {
             const bodyNode = node.childForFieldName('body');
             
             // Extract variables used in the condition
-            const conditionVars = extractVariablesFromCondition(conditionNode);
+            const { variables: conditionVars, controlVariables } = extractVariablesFromCondition(conditionNode);
             
             // Check for loop termination statements
             const terminationInfo = bodyNode ? hasTerminationStatements(bodyNode) : {
@@ -379,6 +495,9 @@ export class InfiniteLoopCheck implements SecurityCheck {
             // Check if this is a timing/waiting loop
             const isWaitLoop = conditionNode && bodyNode ? isTimeBasedWaitLoop(conditionNode, bodyNode) : false;
             
+            // NEW: Check if condition contains function calls that can change its value
+            const hasDynamicCondition = conditionHasFunctionCalls(conditionNode);
+            
             // Check for excessive memory allocations
             const hasExcessiveMemory = bodyNode ? hasExcessiveMemoryUsage(bodyNode) : false;
             
@@ -386,6 +505,7 @@ export class InfiniteLoopCheck implements SecurityCheck {
             context.loopContexts.set(key, {
                 node,
                 variables: conditionVars,
+                controlVariables, // NEW: store the identified control variables
                 modifiedVars: totalModifiedVars,
                 ...terminationInfo,
                 isTicking: isWaitLoop
@@ -407,19 +527,27 @@ export class InfiniteLoopCheck implements SecurityCheck {
                 }
             }
             
-            // 2. Check for condition variables that aren't modified
+            // 2. Check for condition variables that aren't modified - IMPROVED LOGIC
             else {
-                const unmodifiedVars = Array.from(conditionVars)
+                // NEW: Only check control variables, not all condition variables
+                const unmodifiedControlVars = Array.from(controlVariables)
                     .filter(varName => !totalModifiedVars.has(varName));
                 
-                if (unmodifiedVars.length > 0 && 
+                // Skip warning if:
+                // - All control variables are modified, or
+                // - There are termination statements, or
+                // - It's a timing/wait loop, or
+                // - The condition includes function calls that might change its value
+                if (unmodifiedControlVars.length > 0 && 
                     !terminationInfo.hasBreak && 
                     !terminationInfo.hasReturn && 
                     !terminationInfo.hasExit &&
                     !terminationInfo.hasThrow &&
-                    !isWaitLoop) {
+                    !isWaitLoop &&
+                    !hasDynamicCondition) {
+                        
                     issues.push(
-                        `Warning: Loop condition variable(s) [${unmodifiedVars.join(', ')}] never modified in method "${methodName}" at ${formatLineInfo(node)}. This may result in an infinite loop.`
+                        `Warning: Loop control variable(s) [${unmodifiedControlVars.join(', ')}] never modified in method "${methodName}" at ${formatLineInfo(node)}. This may result in an infinite loop.`
                     );
                 }
             }
