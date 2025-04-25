@@ -317,7 +317,7 @@ export class GettingStartedPanelProvider {
     
     <div class="hero">
         <div class="hero-content">
-            <p>AI-powered code security analysis and generation for VS Code. Identify vulnerabilities in your code and generate secure alternatives with Code Llama.</p>
+            <p>SafeScript is an AI-powered VS Code extension designed for C code security analysis. It combines custom static analysis checks with a large language model (LLM) to detect vulnerabilities and automatically suggest secure alternatives. With features like real-time analysis, CWE/CVE mapping, and one-click AI-guided fixes, SafeScript provides a streamlined workflow for developers building secure C applications.</p>
         </div>
     </div>
 

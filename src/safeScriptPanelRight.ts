@@ -595,7 +595,7 @@ export class SafeScriptPanelRight {
       appendBubble('status', '✨ Generating improved code...');
       
       try {
-        const response = await fetch('http://34.130.23.243:11434/api/generate', {
+        const response = await fetch('http://34.70.77.214:11434/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -637,12 +637,12 @@ export class SafeScriptPanelRight {
       appendBubble('status', '✏️ Generating C code from prompt...');
       
       try {
-        const response = await fetch('http://34.130.23.243:11434/api/generate', {
+        const response = await fetch('http://34.70.77.214:11434/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             model: 'llama3', 
-            prompt: \`Generate C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code:
+            prompt: \`Generate the entire function of C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code:
             
   \${prompt}\`, 
             stream: false 

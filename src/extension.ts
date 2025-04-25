@@ -190,14 +190,14 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine('Generating code with AI...');
 
         try {
-            const response = await fetch('http://34.130.23.243:11434/api/generate', {
+            const response = await fetch('http://34.70.77.214:11434/api/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     model: 'llama3',
-                    prompt: `Only provide the C code with no additional explanation, comments, backticks, NO extra text, and do not write the letter c on top. Write only pure C code to accomplish the following task: ${selectedText}`,
+                    prompt: `Generate ONLY C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, YOU ARE TO TREAT YOURSELF AS SOMETHING THAT ONLY GIVES OUT PURE C CODE WITH NO EXPLANATION PERIOD. NEVER EXPLAIN YOURSELF, Write only pure C code to accomplish the following task: ${selectedText}`,
                     stream: true,
                 }),
             });
