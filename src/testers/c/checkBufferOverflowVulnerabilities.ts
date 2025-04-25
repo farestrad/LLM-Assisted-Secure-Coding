@@ -303,7 +303,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                                 const size = parseInt(sizeArg);
                                 buffers.set(lhsName, size);
                         
-                                // 🔥 New heap buffer threshold warning
+                                //  New heap buffer threshold warning
                                 if (size > stackThreshold) {
                                     issues.push(`Warning: Large heap buffer "${lhsName}" (${size} bytes) in "${methodName}" at line ${node.startPosition.row + 1}`);
                                 }
