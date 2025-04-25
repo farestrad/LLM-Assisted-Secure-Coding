@@ -3,17 +3,17 @@
 'use strict';
 
 const path = require('path');
-const webpack = require('webpack'); // Added to inject environment variables
-const dotenv = require('dotenv'); // To load .env file
+const webpack = require('webpack');
+const dotenv = require('dotenv');
 
-dotenv.config(); // Automatically loads environment variables from .env file
+dotenv.config();
 
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
 /** @type WebpackConfig */
 const extensionConfig = {
   target: 'node',
-  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development', // Dynamic mode based on environment
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
 
   entry: './src/extension.ts',
   output: {
@@ -38,11 +38,19 @@ const extensionConfig = {
       },
     ],
   },
+  // Add optimization to prevent data from being stripped in production
+  optimization: {
+    minimize: false, // Prevents aggressive minimization that might remove your data
+    usedExports: true
+  },
   plugins: [
     new webpack.DefinePlugin({
-      // Inject the AMPLITUDE_API_KEY environment variable into the bundle
       'process.env.AMPLITUDE_API_KEY': JSON.stringify(process.env.AMPLITUDE_API_KEY),
     }),
+    // Prevent chunk splitting to keep all your code in one bundle
+    new webpack.optimize.LimitChunkCountPlugin({
+      maxChunks: 1
+    })
   ],
   devtool: 'nosources-source-map',
   infrastructureLogging: {

@@ -3,7 +3,7 @@
   "publisher": "SafeScript",
   "displayName": "SafeScript",
   "description": "Enhances VS Code with Code Llama for AI-powered code analysis and with custom security vulnerability detection.",
-  "version": "2.1.1",
+  "version": "2.1.4",
   "icon": "assets/SafeScript_logo.png",
   "preview": false,
   "galleryBanner.color": {

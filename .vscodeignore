@@ -1,12 +1,3 @@
-# VS Code config and test environments
-.vscode/**
-.vscode-test/**
-
-# Tests and coverage
-out/test/**
-out/__mocks__/**
-coverage/**
-
 # Project config and build tools
 .gitignore
 .yarnrc
@@ -16,8 +7,3 @@ webpack.config.js
 tsconfig*.json
 eslint.config.mjs
 vsc-extension-quickstart.md
-
-# ML models, datasets, and debug assets
-**/*.pkl
-**/*.csv
-ast.json
