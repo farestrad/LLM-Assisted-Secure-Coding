@@ -99,7 +99,7 @@ export class BufferOverflowCheck implements SecurityCheck {
             );
         }
         
-        // NEW: Check if an index is validated by a loop condition
+        // Check if an index is validated by a loop condition
         function isIndexValidatedByLoop(indexVar: string, arrayName: string, accessNode: Parser.SyntaxNode): boolean {
             // Skip checking if indexVar isn't tracked as a loop variable
             if (!loopVariables.has(indexVar)) return false;
@@ -136,32 +136,61 @@ export class BufferOverflowCheck implements SecurityCheck {
             
             return false;
         }
+        
+        // NEW: Check for potential off-by-one errors in loop conditions
+        function checkOffByOneInLoop(loopVar: string, maxBound: number | null, operator: string, 
+                                     bufferName: string | null, bufferSize: number | null, 
+                                     node: Parser.SyntaxNode): boolean {
+            // If we don't have buffer size or max bound, we can't check
+            if (maxBound === null || bufferSize === null || !bufferName) return false;
+            
+            const line = node.startPosition.row + 1;
+            
+            // Check for typical off-by-one scenarios
+            if (operator === '<=' && maxBound === bufferSize) {
+                issues.push(
+                    `Warning: Potential off-by-one error in loop condition at line ${line} in method "${methodName}". Loop uses '<=' with buffer size ${bufferSize} for variable "${loopVar}" accessing buffer "${bufferName}". The last valid index is ${bufferSize-1}.`
+                );
+                return true;
+            }
+            
+            if (operator === '<' && maxBound === bufferSize+1) {
+                issues.push(
+                    `Warning: Potential off-by-one error in loop condition at line ${line} in method "${methodName}". Loop bound ${maxBound} is one more than necessary for buffer "${bufferName}" of size ${bufferSize}.`
+                );
+                return true;
+            }
+            
+            return false;
+        }
 
         function traverse(node: Parser.SyntaxNode) {
             if (visited.has(node)) return;
             visited.add(node);
             
-            // First process all declarations to get buffer sizes
             if (node.type === 'declaration') {
-                const declarator = node.childForFieldName('declarator');
-                if (declarator?.type === 'array_declarator') {
-                    const name = declarator.childForFieldName('declarator')?.text;
-                    const sizeNode = declarator.childForFieldName('size');
-                    let size: number | null = null;
-                    if (sizeNode) {
-                        size = extractSizeLiteral(sizeNode);
-                    }
-
-                    if (name && size !== null) {
+                const declarators = node.descendantsOfType('array_declarator');
+                
+                for (const declarator of declarators) {
+                    const nameNode = declarator.descendantsOfType('identifier')[0];
+                    const sizeNode = declarator.descendantsOfType('number_literal')[0];
+            
+                    if (nameNode && sizeNode) {
+                        const name = nameNode.text;
+                        const size = parseInt(sizeNode.text);
                         buffers.set(name, size);
+            
                         if (size > stackThreshold) {
                             issues.push(`Warning: Large stack buffer "${name}" (${size} bytes) in "${methodName}" at line ${node.startPosition.row + 1}`);
                         }
+            
+                        
                     }
                 }
             }
             
-            // NEW: Track loop variables and their bounds
+            
+            // Track loop variables and their bounds
             if (node.type === 'for_statement') {
                 // 1. Extract initialization (e.g., int i = 0)
                 const initNode = node.childForFieldName('initializer');
@@ -173,6 +202,7 @@ export class BufferOverflowCheck implements SecurityCheck {
                 let loopVar: string | null = null;
                 let minBound: number | null = null;
                 let maxBound: number | null = null;
+                let condOperator: string = '';
                 
                 // First try to get the variable from initialization
                 if (initNode?.type === 'declaration') {
@@ -205,15 +235,126 @@ export class BufferOverflowCheck implements SecurityCheck {
                     
                     if (leftNode?.type === 'identifier' && 
                         ['<', '<='].includes(opNode?.text || '') && 
-                        rightNode?.type === 'number_literal') {
+                        rightNode) {
                         
                         // Only set loopVar if we didn't get it from initialization
                         loopVar = loopVar || leftNode.text;
-                        maxBound = parseInt(rightNode.text);
+                        condOperator = opNode?.text || '';
                         
-                        // Adjust for <= operator
-                        if (opNode?.text === '<=') {
-                            maxBound += 1;
+                        if (rightNode.type === 'number_literal') {
+                            maxBound = parseInt(rightNode.text);
+                            
+                            // Check if this is a loop over an array and detect array size
+                            const lineNum = node.startPosition.row + 1;
+                            const comparisonValue = maxBound;
+                            
+                            // Look for arrays in this scope that might be related to this loop
+                            for (const [bufferName, bufferSize] of buffers.entries()) {
+                                // If the comparison value matches the array size, this could be off-by-one
+                                if (opNode?.text === '<=' && comparisonValue === bufferSize) {
+                                    issues.push(
+                                        `Warning: Off-by-one error detected at line ${lineNum} in method "${methodName}". Loop condition "i <= ${bufferSize}" will access array "${bufferName}" out of bounds. Last valid index is ${bufferSize-1}.`
+                                    );
+                                }
+                            }
+                            
+                            // Adjust for <= operator
+                            if (opNode?.text === '<=') {
+                                maxBound += 1;
+                            }
+                        } else if (rightNode.type === 'identifier') {
+                            // The loop bound is a variable - check if it's a buffer size
+                            const boundVar = rightNode.text;
+                            
+                            // NEW: Check for potential off-by-one errors in loop conditions that use buffer sizes
+                            if (buffers.has(boundVar)) {
+                                // The loop is iterating up to a buffer's size
+                                const bufferSize = buffers.get(boundVar)!;
+                                maxBound = opNode?.text === '<' ? bufferSize : bufferSize + 1;
+                                
+                                // Check for off-by-one when accessing buffer with this loop
+                                const offByOneFound = checkOffByOneInLoop(
+                                    loopVar, 
+                                    maxBound, 
+                                    condOperator,
+                                    boundVar,
+                                    bufferSize,
+                                    node
+                                );
+                                
+                                // Add specific warning for using <= with array size
+                                if (opNode?.text === '<=') {
+                                    issues.push(
+                                        `Warning: Off-by-one error detected at line ${node.startPosition.row + 1} in method "${methodName}". Loop condition "${loopVar} <= ${boundVar}" can access array out of bounds. The last valid index is ${bufferSize-1}.`
+                                    );
+                                }
+                            } else {
+                                // If it's not directly a buffer size, it might be a related variable
+                                // Check common patterns like "length" or "size" variables
+                                for (const [bufName, bufSize] of buffers.entries()) {
+                                    if (boundVar === `${bufName}_len` || 
+                                        boundVar === `${bufName}_size` || 
+                                        boundVar === `${bufName}Length` || 
+                                        boundVar === `${bufName}Size`) {
+                                        
+                                        // Check for off-by-one with this derived size variable
+                                        const offByOneFound = checkOffByOneInLoop(
+                                            loopVar, 
+                                            maxBound, 
+                                            condOperator,
+                                            bufName,
+                                            bufSize,
+                                            node
+                                        );
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // NEW: Check for off-by-one errors in condition structure
+                        // For example: for(i=0; i <= len; i++) is often an off-by-one error
+                        // when len represents the length of an array
+                        if (maxBound !== null && condOperator === '<=') {
+                            // Look for array accesses inside the loop body
+                            const bodyNode = node.childForFieldName('body');
+                            if (bodyNode) {
+                                // Analyze the body to see if this loop variable is used to access arrays
+                                let foundArrayAccess = false;
+                                let accessedArray = '';
+                                
+                                function findArrayAccesses(n: Parser.SyntaxNode) {
+                                    if (n.type === 'subscript_expression') {
+                                        const arrayNode = n.child(0);
+                                        const indexNode = n.child(1);
+                                        
+                                        if (indexNode?.type === 'identifier' && 
+                                            indexNode.text === loopVar && 
+                                            arrayNode?.type === 'identifier') {
+                                            
+                                            foundArrayAccess = true;
+                                            accessedArray = arrayNode.text;
+                                        }
+                                    }
+                                    
+                                    for (const child of n.namedChildren) {
+                                        findArrayAccesses(child);
+                                    }
+                                }
+                                
+                                findArrayAccesses(bodyNode);
+                                
+                                if (foundArrayAccess && buffers.has(accessedArray)) {
+                                    const arraySize = buffers.get(accessedArray)!;
+                                    
+                                    // If the loop goes to <= array length, it's an off-by-one error
+                                    if (maxBound > arraySize && maxBound <= arraySize + 1) {
+                                        issues.push(
+                                            `Warning: Potential off-by-one error at line ${node.startPosition.row + 1} in method "${methodName}". Loop uses condition "${loopVar} <= ${maxBound-1}" when accessing array "${accessedArray}" of size ${arraySize}. The last valid index is ${arraySize-1}.`
+                                        );
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -240,34 +381,30 @@ export class BufferOverflowCheck implements SecurityCheck {
                 }
             }
             
-            if (node.type === 'declaration') {
-                const declNodes = node.descendantsOfType('init_declarator');
-                for (const declNode of declNodes) {
-                    const nameNode = declNode.childForFieldName('declarator');
-                    const valueNode = declNode.childForFieldName('value');
+            if (node.type === 'init_declarator') {
+                const declaratorNode = node.childForFieldName('declarator');
+                const valueNode = node.childForFieldName('value');
+                
+                if (declaratorNode?.type === 'identifier' && valueNode?.type === 'call_expression') {
+                    const fnName = valueNode.child(0)?.text;
+                    const args = valueNode.child(1)?.namedChildren || [];
                     
-                    if (nameNode && valueNode?.type === 'call_expression') {
-                        const fnName = valueNode.child(0)?.text;
-                        const args = valueNode.child(1)?.namedChildren || [];
-                        
-                        if (fnName === 'malloc' && args.length > 0) {
-                            const varName = nameNode.text;
-                            const sizeArg = args[0].text;
-                        
-                            if (/^\d+$/.test(sizeArg)) {
-                                // Numerical size
-                                const size = parseInt(sizeArg);
-                                buffers.set(varName, size);
-                        
-                                // 🔥 New heap buffer threshold warning
-                                if (size > stackThreshold) {
-                                    issues.push(`Warning: Large heap buffer "${varName}" (${size} bytes) in "${methodName}" at line ${node.startPosition.row + 1}`);
-                                }
+                    if (fnName === 'malloc' && args.length > 0) {
+                        const varName = declaratorNode.text;
+                        const sizeArg = args[0].text;
+                    
+                        if (/^\d+$/.test(sizeArg)) {
+                            // Numerical size
+                            const size = parseInt(sizeArg);
+                            buffers.set(varName, size);
+                    
+                            // Heap buffer threshold warning
+                            if (size > stackThreshold) {
+                                issues.push(`Warning: Large heap buffer "${varName}" (${size} bytes) in "${methodName}" at line ${node.startPosition.row + 1}`);
                             }
-                        
-                            mallocAssigned.add(varName);
                         }
-                        
+                    
+                        mallocAssigned.add(varName);
                     }
                 }
             }
@@ -363,11 +500,49 @@ export class BufferOverflowCheck implements SecurityCheck {
                         }
                     }
                 }
+                
+                // NEW: Check for off-by-one errors in string functions
+                if (fnName === 'strncpy' || fnName === 'memcpy' || fnName === 'memmove') {
+                    const destArg = args[0]?.text;
+                    const sizeArg = args[2];
+                    
+                    if (destArg && sizeArg && buffers.has(destArg)) {
+                        const bufSize = buffers.get(destArg)!;
+                        
+                        if (sizeArg.type === 'number_literal') {
+                            const copySize = parseInt(sizeArg.text);
+                            
+                            // If copy size is exactly the buffer size, this is likely an off-by-one error
+                            // for null-terminated strings
+                            if (copySize === bufSize && fnName === 'strncpy') {
+                                issues.push(
+                                    `Warning: Potential off-by-one error at line ${node.startPosition.row + 1} in method "${methodName}". Using size ${copySize} with strncpy to buffer "${destArg}" of same size ${bufSize} leaves no room for null terminator.`
+                                );
+                            }
+                        } else if (sizeArg.type === 'identifier') {
+                            // If size arg is the same as the buffer size variable, it might be an off-by-one
+                            for (const [bufName, size] of buffers.entries()) {
+                                if (sizeArg.text === `${bufName}_len` || 
+                                    sizeArg.text === `${bufName}_size` || 
+                                    sizeArg.text === `${bufName}Length` || 
+                                    sizeArg.text === `${bufName}Size`) {
+                                    
+                                    if (bufName === destArg && fnName === 'strncpy') {
+                                        issues.push(
+                                            `Warning: Potential off-by-one error at line ${node.startPosition.row + 1} in method "${methodName}". Using buffer's size directly with strncpy may leave no room for null terminator.`
+                                        );
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 if (fnName) calledFunctions.add(fnName);
             }
 
-            // NEW: Track subscript_expression nodes for array access validation
+            // Track subscript_expression nodes for array access validation
             if (node.type === 'subscript_expression') {
                 const arrayNode = node.child(0);
                 const indexNode = node.child(1);
@@ -376,15 +551,61 @@ export class BufferOverflowCheck implements SecurityCheck {
                     const arrayName = arrayNode.text;
                     const resolvedArray = aliases.get(arrayName) || arrayName;
                     
-                    // Skip if array name is not a known buffer
+                    // Get the buffer size if known
+                    const bufferSize = buffers.get(resolvedArray);
+                    
+                    // Check for array access with a constant index that's out of bounds
+                    if (indexNode.type === 'number_literal') {
+                        const indexVal = parseInt(indexNode.text);
+                        
+                        // If buffer size is known, check for out-of-bounds access
+                        if (bufferSize !== undefined) {
+                            // Clear out-of-bounds access
+                            if (indexVal >= bufferSize) {
+                                console.log("Buffers:", [...buffers.entries()]);
+
+                                issues.push(
+                                    `Warning: Array index out of bounds: "${arrayName}[${indexVal}]" exceeds buffer size ${bufferSize} in "${methodName}" at line ${node.startPosition.row + 1}. Valid indices are 0 to ${bufferSize-1}.`
+                                );
+                            }
+                            
+                            // NEW: Specific check for off-by-one pattern where index is exactly bufferSize-1
+                            if (indexVal === bufferSize - 1) {
+                                // This is right at the boundary - might be intentional, but flag if it's used in
+                                // a memory-intensive operation
+                                const parent = node.parent;
+                                if (parent?.type === 'assignment_expression' && parent.child(0) === node) {
+                                    issues.push(
+                                        `Warning: Potential off-by-one vulnerability at line ${node.startPosition.row + 1} in method "${methodName}". Writing to last element "${arrayName}[${indexVal}]" (size ${bufferSize}). Verify this is intentional.`
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Skip the rest of this block if array name is not a known buffer
                     if (!buffers.has(resolvedArray) && !mallocAssigned.has(resolvedArray)) {
                         // Continue with other children
                         node.namedChildren.forEach(child => traverse(child));
                         return;
                     }
                     
-                    if (indexNode.type === 'identifier') {
+                    // NEW: Specifically check for the buffer[size] off-by-one error pattern
+                    if (indexNode.type === 'identifier' && buffers.has(resolvedArray)) {
                         const indexVar = indexNode.text;
+                        const bufferSize = buffers.get(resolvedArray)!;
+                        
+                        // Check if the indexVar is equal to bufferSize or bufferSize-1
+                        if (indexVar === `${resolvedArray}_size` || 
+                            indexVar === `${resolvedArray}_len` ||
+                            indexVar === `${resolvedArray}Size` ||
+                            indexVar === `${resolvedArray}Length`) {
+                            
+                            issues.push(
+                                `Warning: Potential off-by-one error at line ${node.startPosition.row + 1} in method "${methodName}". Accessing "${arrayName}" with its size as index. Arrays are 0-indexed, so valid indices are 0 to size-1.`
+                            );
+                        }
+                        
                         const accessId = `${arrayName}[${indexVar}]_${node.startPosition.row}`;
                         
                         // Store this access for later validation
@@ -403,15 +624,33 @@ export class BufferOverflowCheck implements SecurityCheck {
                                 `Warning: Unvalidated index "${indexVar}" used with "${arrayName}" in "${methodName}" at line ${node.startPosition.row + 1}`
                             );
                         }
-                    } else if (indexNode.type === 'number_literal') {
-                        const indexVal = parseInt(indexNode.text);
-                        const bufferSize = buffers.get(resolvedArray);
+                    } else if (indexNode.type === 'binary_expression') {
+                        // Check for patterns like array[i+1] where i is a loop variable
+                        const left = indexNode.child(0);
+                        const op = indexNode.child(1)?.text;
+                        const right = indexNode.child(2);
                         
-                        // If buffer size is known and index exceeds it, warn
-                        if (bufferSize !== undefined && indexVal >= bufferSize) {
-                            issues.push(
-                                `Warning: Array index out of bounds: "${arrayName}[${indexVal}]" exceeds buffer size ${bufferSize} in "${methodName}" at line ${node.startPosition.row + 1}`
-                            );
+                        if (left?.type === 'identifier' && op === '+' && right?.type === 'number_literal') {
+                            const loopVar = left.text;
+                            const offset = parseInt(right.text);
+                            
+                            // If this is a loop variable and we know its bounds
+                            if (loopVariables.has(loopVar)) {
+                                const loopInfo = loopVariables.get(loopVar)!;
+                                const maxBound = loopInfo.max;
+                                
+                                // If we know the buffer size and max loop bound
+                                if (buffers.has(resolvedArray) && maxBound !== null) {
+                                    const bufferSize = buffers.get(resolvedArray)!;
+                                    
+                                    // Check if the max index (maxBound-1+offset) would exceed buffer bounds
+                                    if (maxBound - 1 + offset >= bufferSize) {
+                                        issues.push(
+                                            `Warning: Potential off-by-one error at line ${node.startPosition.row + 1} in method "${methodName}". Expression "${loopVar}+${offset}" can access out of bounds of "${arrayName}" (size ${bufferSize}).`
+                                        );
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -441,7 +680,7 @@ export class BufferOverflowCheck implements SecurityCheck {
 
         traverse(tree.rootNode);
 
-        // NEW: Post-process array accesses to remove warnings for loop-bounded ones
+        // Post-process array accesses to remove warnings for loop-bounded ones
         for (const [accessId, accessInfo] of arrayAccesses) {
             const { arrayName, indexVar, node } = accessInfo;
             
