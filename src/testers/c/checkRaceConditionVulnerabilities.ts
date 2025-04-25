@@ -40,6 +40,8 @@ export class RaceConditionCheck implements SecurityCheck {
             fileOperations: new Map<string, {node: Parser.SyntaxNode, operation: string, path?: string, fdVar?: string}>(),
             lockOperations: new Map<string, {node: Parser.SyntaxNode, lockType: string}>(),
             fileDescriptors: new Map<string, string>(), // fd variable -> filepath
+            filePointers: new Map<string, string>(), // FILE* variable -> filepath
+            fdToFilePointer: new Map<string, string>(), // fd variable -> FILE* variable (for fileno mapping)
             fileOperationsByFd: new Map<string, {operation: string, node: Parser.SyntaxNode}[]>(), // fd variable -> operations
             synchronizedContext: false,
             checkOperations: new Map<string, Parser.SyntaxNode>(),
@@ -57,6 +59,7 @@ export class RaceConditionCheck implements SecurityCheck {
         // Track filenames and their variables
         const filePathVariables = new Set<string>();
         const fileDescriptorVariables = new Set<string>();
+        const filePointerVariables = new Set<string>();
         
         // Enhanced keywords for race condition detection
         const fileAccessFunctions = config.get<string[]>('raceConditionKeywords', [
@@ -210,6 +213,58 @@ export class RaceConditionCheck implements SecurityCheck {
                 });
             }
         }
+
+        // Add a check for basic file operations without validation
+function hasFilePathValidation(methodBody: string): boolean {
+    // Check for path traversal validation
+    const hasTraversalCheck = /strstr\s*\([^,]+,\s*["']\.\.["']\)/.test(methodBody);
+    // Check for other common validation patterns
+    const hasLengthCheck = /strlen\s*\(\s*[\w]+\s*\)\s*[<>]=?\s*\d+/.test(methodBody);
+    const hasCharCheck = /strchr\s*\(\s*[\w]+\s*,\s*['"]\/['"]\s*\)/.test(methodBody);
+    
+    return hasTraversalCheck || hasLengthCheck || hasCharCheck;
+}
+
+// In the main analysis code:
+const hasValidation = hasFilePathValidation(methodBody);
+if (!hasValidation && methodBody.includes('fopen') && !hasFlockWithFilenoPattern(methodBody)) {
+    // Check for complete pattern of safe usage
+    if (!isSafeFileOperationPattern()) {
+        issues.push(
+            `Warning: File operations without proper path validation may lead to Time-of-Check to Time-of-Use (TOCTOU) race conditions in method "${methodName}". Add path validation and file locking mechanisms.`
+        );
+    }
+}
+        
+        // Helper: Find the associated path for a file variable or descriptor
+        function findAssociatedPath(variable: string): string | undefined {
+            // First check if it's a direct file descriptor we know
+            if (context.fileDescriptors.has(variable)) {
+                return context.fileDescriptors.get(variable);
+            }
+            
+            // Check if it's a file pointer we know
+            if (context.filePointers.has(variable)) {
+                return context.filePointers.get(variable);
+            }
+            
+            // Check if it's a fd that came from fileno()
+            if (context.fdToFilePointer.has(variable)) {
+                const filePtr = context.fdToFilePointer.get(variable);
+                if (filePtr && context.filePointers.has(filePtr)) {
+                    return context.filePointers.get(filePtr);
+                }
+            }
+            
+            // Check if it's used in any file operations we know
+            for (const [path, op] of context.fileOperations.entries()) {
+                if (op.fdVar === variable) {
+                    return path;
+                }
+            }
+            
+            return undefined;
+        }
         
         // Helper: Determine if an operation might be protected by synchronization
         function isLikelyProtected(operation: string, path: string): boolean {
@@ -252,13 +307,51 @@ export class RaceConditionCheck implements SecurityCheck {
             // Check for dirname pattern
             const hasDirname = /dirname\s*\([^)]+\)/.test(methodBody);
             
-            return hasBasename || hasDirname || hasRealpath;
+            // Check for strstr pattern to detect path traversal validation
+            const hasPathTraversalCheck = /strstr\s*\([^,]+,\s*["']\.\.["']\)/.test(methodBody);
+            
+            return hasBasename || hasDirname || hasRealpath || hasPathTraversalCheck;
+        }
+        
+        // Helper to detect locking patterns specifically with flock and fileno
+        function hasFlockWithFilenoPattern(methodBody: string): boolean {
+            // Check for the pattern: fileno(file) followed by flock
+            const filenoPattern = /fileno\s*\(\s*(\w+)\s*\)/g;
+            let filenoMatches = [...methodBody.matchAll(filenoPattern)];
+            
+            for (const match of filenoMatches) {
+                const fileVar = match[1];
+                const fdVarPattern = new RegExp(`(\\w+)\\s*=\\s*fileno\\s*\\(\\s*${fileVar}\\s*\\)`, 'g');
+                const fdVarMatches = [...methodBody.matchAll(fdVarPattern)];
+                
+                // Check if any of these file descriptors are used with flock
+                for (const fdMatch of fdVarMatches) {
+                    const fdVar = fdMatch[1];
+                    const flockPattern = new RegExp(`flock\\s*\\(\\s*${fdVar}\\s*,.*?LOCK_[A-Z]{2}.*?\\)`, 'g');
+                    if (flockPattern.test(methodBody)) {
+                        return true;
+                    }
+                }
+                
+                // Check for direct use of fileno with flock
+                const directFlockPattern = new RegExp(`flock\\s*\\(\\s*fileno\\s*\\(\\s*${fileVar}\\s*\\)\\s*,.*?LOCK_[A-Z]{2}.*?\\)`, 'g');
+                if (directFlockPattern.test(methodBody)) {
+                    return true;
+                }
+            }
+            
+            return false;
         }
         
         // Helper to detect safe file operation patterns, especially fopen/fprintf/fclose sequences
         function isSafeFileOperationPattern(): boolean {
             // Check for path sanitization + secure opening pattern
             if (context.hasBasenameSanitization && context.hasSecureOpenFlags) {
+                return true;
+            }
+            
+            // Check for flock with fileno pattern
+            if (hasFlockWithFilenoPattern(methodBody)) {
                 return true;
             }
             
@@ -367,7 +460,10 @@ export class RaceConditionCheck implements SecurityCheck {
         // Pre-check: Scan for path sanitization and secure opening patterns
         context.hasBasenameSanitization = isBasenameOrPathnamePattern(methodBody);
         
-        // First pass: identify file descriptor variables
+        // Scan for fileno -> flock patterns
+        const hasFilenoFlockPattern = hasFlockWithFilenoPattern(methodBody);
+        
+        // First pass: identify file descriptor variables, fileno calls, etc.
         function identifyFileDescriptors(node: Parser.SyntaxNode) {
             // Look for file descriptor assignments from open/fopen calls
             if (node.type === 'assignment_expression') {
@@ -378,8 +474,13 @@ export class RaceConditionCheck implements SecurityCheck {
                     const fnName = rhs.child(0)?.text;
                     
                     if (fnName === 'fopen' || fnName === 'open') {
-                        const fdVar = lhs.text;
-                        fileDescriptorVariables.add(fdVar);
+                        const varName = lhs.text;
+                        
+                        if (fnName === 'fopen') {
+                            filePointerVariables.add(varName);
+                        } else {
+                            fileDescriptorVariables.add(varName);
+                        }
                         
                         // If we can extract the path, associate it with this file descriptor
                         const argList = rhs.child(1);
@@ -388,7 +489,11 @@ export class RaceConditionCheck implements SecurityCheck {
                             const path = extractPathArgument(pathArg);
                             
                             if (path) {
-                                context.fileDescriptors.set(fdVar, path);
+                                if (fnName === 'fopen') {
+                                    context.filePointers.set(varName, path);
+                                } else {
+                                    context.fileDescriptors.set(varName, path);
+                                }
                                 
                                 // Also track this as a file operation
                                 trackFileOperation(node, fnName, pathArg, lhs);
@@ -402,11 +507,32 @@ export class RaceConditionCheck implements SecurityCheck {
                                 context.hasSecureOpenFlags = true;
                             }
                         }
+                    } else if (fnName === 'fileno') {
+                        // Track fileno(file) -> fd mapping
+                        const fdVar = lhs.text;
+                        fileDescriptorVariables.add(fdVar);
+                        
+                        // Get the FILE* pointer being used
+                        const argList = rhs.child(1);
+                        if (argList && argList.namedChildren.length > 0) {
+                            const filePointerArg = argList.namedChildren[0];
+                            if (filePointerArg.type === 'identifier') {
+                                const filePointerName = filePointerArg.text;
+                                // Store the mapping fd -> FILE*
+                                context.fdToFilePointer.set(fdVar, filePointerName);
+                                
+                                // If we know what file this FILE* points to, propagate to fd
+                                if (context.filePointers.has(filePointerName)) {
+                                    const path = context.filePointers.get(filePointerName)!;
+                                    context.fileDescriptors.set(fdVar, path);
+                                }
+                            }
+                        }
                     }
                 }
             }
             
-            // Check for callsite with secure flags
+            // Look for direct fileno call in flock arguments
             if (node.type === 'call_expression') {
                 const fnName = node.child(0)?.text;
                 const argsNode = node.child(1);
@@ -419,6 +545,37 @@ export class RaceConditionCheck implements SecurityCheck {
                         if (isStandardStream(lastArg)) {
                             context.standardStreamOperations.add(node);
                             return; // Skip further processing for this node
+                        }
+                    }
+                }
+                
+                // Track fileno in flock call: flock(fileno(file), ...)
+                if (fnName === 'flock' && argsNode && argsNode.namedChildren.length > 0) {
+                    const firstArg = argsNode.namedChildren[0];
+                    
+                    if (firstArg.type === 'call_expression') {
+                        const innerFnName = firstArg.child(0)?.text;
+                        
+                        if (innerFnName === 'fileno') {
+                            // This is a flock(fileno(file), ...) pattern
+                            const innerArgsNode = firstArg.child(1);
+                            
+                            if (innerArgsNode && innerArgsNode.namedChildren.length > 0) {
+                                const filePointerArg = innerArgsNode.namedChildren[0];
+                                
+                                if (filePointerArg.type === 'identifier') {
+                                    const filePointerName = filePointerArg.text;
+                                    
+                                    // If we know what file this FILE* points to, mark it as locked
+                                    if (context.filePointers.has(filePointerName)) {
+                                        const path = context.filePointers.get(filePointerName)!;
+                                        context.lockOperations.set(path, {
+                                            node,
+                                            lockType: 'flock'
+                                        });
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -443,28 +600,8 @@ export class RaceConditionCheck implements SecurityCheck {
         // Main analysis pass
         function traverse(node: Parser.SyntaxNode) {
             // Look for critical sections or synchronized contexts
-            if (node.type === 'block' || node.type === 'compound_statement') {
-                // Check if this block is preceded by a lock operation
-                const prevSibling = node.previousSibling;
-                if (prevSibling?.type === 'call_expression') {
-                    const fnName = prevSibling.child(0)?.text || '';
-                    
-                    if (fileLockFunctions.some(lockFn => fnName.toLowerCase().includes(lockFn.toLowerCase()))) {
-                        // This block is likely protected by a lock
-                        const prevSynchronizedContext = context.synchronizedContext;
-                        context.synchronizedContext = true;
-                        
-                        // Recursively process the synchronized block
-                        node.namedChildren.forEach(traverse);
-                        
-                        // Restore previous context
-                        context.synchronizedContext = prevSynchronizedContext;
-                        
-                        // Skip further processing of this node since we already traversed it
-                        return;
-                    }
-                }
-            }
+            
+              
             
             // Check for function calls that might indicate file operations
             if (node.type === 'call_expression') {
@@ -530,6 +667,34 @@ export class RaceConditionCheck implements SecurityCheck {
                             return; // Skip standard stream operations 
                         }
                         
+                        // Get all locked paths
+                        const lockedPaths = Array.from(context.lockOperations.keys());
+                        
+                        // Check if this operation is on a locked path or file descriptor
+                        let isProtected = false;
+                        
+                        // Check if this is a file pointer operation (fwrite, fprintf, etc.)
+                        if (argsNode && argsNode.namedChildren.length > 0) {
+                            const firstArg = argsNode.namedChildren[0];
+                            if (firstArg.type === 'identifier') {
+                                const filePointerName = firstArg.text;
+                                
+                                // Check if this file pointer is associated with a locked path
+                                if (context.filePointers.has(filePointerName)) {
+                                    const path = context.filePointers.get(filePointerName)!;
+                                    if (lockedPaths.includes(path)) {
+                                        isProtected = true;
+                                    }
+                                }
+                                
+                                // Check if there's fileno -> flock pattern for this file pointer
+                                if (hasFilenoFlockPattern && filePointerVariables.has(filePointerName)) {
+                                    // This is likely protected by a flock call
+                                    isProtected = true;
+                                }
+                            }
+                        }
+                        
                         // Run the check for safe patterns AFTER we've tracked this operation
                         const isPartOfSafePattern = isSafeFileOperationPattern();
                         
@@ -538,7 +703,9 @@ export class RaceConditionCheck implements SecurityCheck {
                         
                         // Only warn if detection level and pattern analysis justifies it
                         if (detectionLevel === 'strict' || 
-                           (detectionLevel === 'moderate' && !isPartOfSafePattern && !hasSecurePattern)) {
+                           (detectionLevel === 'moderate' && !isPartOfSafePattern && 
+                                                           !hasSecurePattern && 
+                                                           !isProtected)) {
                             
                             // Final check for standard streams before issuing warning
                             let isStdioOperation = false;
@@ -551,14 +718,13 @@ export class RaceConditionCheck implements SecurityCheck {
                                 }
                             }
                             
-                            if (!isStdioOperation) {
+                            if (!isStdioOperation && !isProtected) {
                                 issues.push(
                                     `Warning: Unprotected file operation "${fnName}" detected at ${formatLineInfo(node)} in method "${methodName}". Consider using proper file locking.`
                                 );
                             }
                         }
                     }
-                }
                 
                 // Track metadata operations
                 if (metadataFunctions.includes(fnName)) {
@@ -585,20 +751,21 @@ export class RaceConditionCheck implements SecurityCheck {
                 if (fileLockFunctions.some(lockFn => fnName.toLowerCase().includes(lockFn.toLowerCase()))) {
                     // If this is a file-specific lock like flock
                     if (fnName === 'flock' || fnName === 'lockf') {
-                        const fdArg = argsNode?.namedChildren[0];
+                        const fdArg = argsNode?.namedChildren[0]; // ✅ Get first arg (fd)
                         
                         if (fdArg?.type === 'identifier') {
                             const fdVar = fdArg.text;
                             
-                            // If we know which file this descriptor refers to
-                            if (context.fileDescriptors.has(fdVar)) {
-                                const path = context.fileDescriptors.get(fdVar)!;
-                                context.lockOperations.set(path, {
+                            // ✅ Now associate fdVar → known filepath
+                            const lockedPath = context.fileDescriptors.get(fdVar);
+                            if (lockedPath) {
+                                context.lockOperations.set(lockedPath, {
                                     node,
                                     lockType: fnName
                                 });
                             }
                         }
+                                        
                     } else {
                         // General synchronization primitives
                         context.synchronizedContext = true;
@@ -713,6 +880,8 @@ export class RaceConditionCheck implements SecurityCheck {
             return []; // No race conditions with standard streams
         }
 
-        return issues;
+        
+    }
+    return issues;
     }
 }

@@ -214,8 +214,6 @@ export class HeapOverflowCheck implements SecurityCheck {
                                             );
                                         }
                                     }
-                                    
-                                    
                                 }
                             }
                         }
@@ -288,9 +286,6 @@ export class HeapOverflowCheck implements SecurityCheck {
                                         );
                                     }
                                 }
-                                
-                                
-                                
                             }
                         }
                         
@@ -433,7 +428,6 @@ export class HeapOverflowCheck implements SecurityCheck {
                                     allocation.freed = true;
                                     heapAllocations.set(resolvedPtr, allocation);
                                 }
-                                  
                             }
                         }
                         
@@ -477,36 +471,82 @@ export class HeapOverflowCheck implements SecurityCheck {
                 }
                 
                 case 'subscript_expression': {
-                    // Array access (buffer[index])
+                    // FIXED: Proper handling of array access (buffer[index])
                     const array = node.child(0);
                     const index = node.child(1);
                     
-                    if (array?.type === 'identifier' && index) {
+                    // Skip if we don't have both array and index parts
+                    if (!array || !index) break;
+                    
+                    // Only process if the array is an identifier
+                    if (array.type === 'identifier') {
                         const arrayName = array.text;
-                        const indexExpr = index.text;
                         const line = getLineNumber(node);
                         
                         // Check if this is a heap-allocated buffer
                         const resolvedArray = resolveAlias(arrayName);
                         if (heapAllocations.has(resolvedArray)) {
                             const allocation = heapAllocations.get(resolvedArray);
+                            if (!allocation) break; // Safety check
                             
-                            // Check for out-of-bounds access
-                            if (allocation && allocation.sizeEval !== null) {
-                                const indexVal = evaluateExpression(indexExpr);
+                            // FIXED: Better handling of index expression
+                            // Only check if it's a simple identifier or number for now
+                            
+                            // Skip if the index is a call expression to strcspn
+                            if (index.type === 'call_expression') {
+                                const callee = index.child(0)?.text;
+                                if (callee === 'strcspn') {
+                                    // Likely safe use case - no need to warn
+                                    break;
+                                }
+                            }
+                            
+                            // For identifiers, check if validated
+                            if (index.type === 'identifier') {
+                                const indexName = index.text;
+                                if (!isValidated(indexName)) {
+                                    issues.push(
+                                        `Warning: Unvalidated array index variable "${indexName}" used with heap-allocated buffer "${arrayName}" at line ${line} in method "${methodName}". Always validate indices to prevent heap overflow.`
+                                    );
+                                }
+                            }
+                            // For literals, check bounds
+                            else if (index.type === 'number_literal') {
+                                const indexVal = parseInt(index.text, 10);
+                                if (indexVal < 0) {
+                                    issues.push(
+                                        `Warning: Negative array index (${indexVal}) used with heap-allocated buffer "${arrayName}" at line ${line} in method "${methodName}". This leads to undefined behavior.`
+                                    );
+                                } else if (allocation.sizeEval !== null && indexVal >= allocation.sizeEval) {
+                                    issues.push(
+                                        `Warning: Heap buffer overflow detected at line ${line} in method "${methodName}". Index ${indexVal} exceeds allocated size ${allocation.sizeEval} for buffer "${arrayName}".`
+                                    );
+                                }
+                            }
+                            // For expressions, attempt to evaluate
+                            else {
+                                // Try to get meaningful text from the index node
+                                const indexText = index.text.replace(/^\[|\]$/g, '').trim();
+                                
+                                // Skip if the index is empty or just syntax characters
+                                if (!indexText || /^[\[\]\(\){}]$/.test(indexText)) {
+                                    break;
+                                }
+                                
+                                const indexVal = evaluateExpression(indexText);
                                 if (indexVal !== null) {
                                     if (indexVal < 0) {
                                         issues.push(
                                             `Warning: Negative array index (${indexVal}) used with heap-allocated buffer "${arrayName}" at line ${line} in method "${methodName}". This leads to undefined behavior.`
                                         );
-                                    } else if (indexVal >= allocation.sizeEval) {
+                                    } else if (allocation.sizeEval !== null && indexVal >= allocation.sizeEval) {
                                         issues.push(
                                             `Warning: Heap buffer overflow detected at line ${line} in method "${methodName}". Index ${indexVal} exceeds allocated size ${allocation.sizeEval} for buffer "${arrayName}".`
                                         );
                                     }
-                                } else if (!isValidated(indexExpr)) {
+                                } else if (!isValidated(indexText)) {
                                     issues.push(
-                                        `Warning: Unvalidated array index "${indexExpr}" used with heap-allocated buffer "${arrayName}" at line ${line} in method "${methodName}". Always validate indices to prevent heap overflow.`
+                                        `Warning: Unvalidated array index expression "${indexText}" used with heap-allocated buffer "${arrayName}" at line ${line} in method "${methodName}". Always validate indices to prevent heap overflow.`
                                     );
                                 }
                             }
@@ -554,9 +594,6 @@ export class HeapOverflowCheck implements SecurityCheck {
         
         // Start traversal
         traverse(tree.rootNode);
-        
-        
-
         
         return issues;
     }

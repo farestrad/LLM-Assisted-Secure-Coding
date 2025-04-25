@@ -255,29 +255,37 @@ export class OtherVulnerabilitiesCheck implements SecurityCheck {
                         }
                         
                         // 7. Format String Vulnerability Check
-                        if (formatStringFunctions.includes(fnName) && args.length > 1) {
-                            const formatString = args[0];
-                            
-                            // Check if format string is a variable (potential format string vulnerability)
-                            if (!formatString.startsWith('"') && !formatString.startsWith("'") && 
-                                !trustedInputVars.has(formatString)) {
-                                issues.push(
-                                    `Warning: Potential format string vulnerability detected in call to "${fnName}" at line ${line} in method "${methodName}". First argument should be a literal format string, not a variable.`
-                                );
-                            }
-                            
-                            // Check if format specifiers match argument count
-                            if (formatString.startsWith('"') || formatString.startsWith("'")) {
-                                const formatSpecifiers = formatString.match(/%[sdioxXufeEgGaAcsp]/g);
-                                const specifierCount = formatSpecifiers ? formatSpecifiers.length : 0;
-                                
-                                if (specifierCount > args.length - 1) {
-                                    issues.push(
-                                        `Warning: Format string at line ${line} in method "${methodName}" has more format specifiers (${specifierCount}) than arguments (${args.length - 1}), which can lead to undefined behavior or crashes.`
-                                    );
-                                }
-                            }
-                        }
+if (formatStringFunctions.includes(fnName) && args.length > 1) {
+    // For snprintf and similar functions, the format string is the third argument
+    const formatArgIndex = ['snprintf', 'vsnprintf'].includes(fnName) ? 2 : 0;
+    
+    // Only check if we have enough arguments
+    if (argsNode.namedChildren.length > formatArgIndex) {
+        const formatArgNode = argsNode.namedChildren[formatArgIndex];
+        const formatString = args[formatArgIndex];
+        
+        // Check if format arg is not a literal and not trusted
+        if (formatArgNode.type !== 'string_literal' && !trustedInputVars.has(formatArgNode.text)) {
+            issues.push(
+                `Warning: Potential format string vulnerability detected in call to "${fnName}" at line ${line} in method "${methodName}". Format string argument should be a literal string, not a variable.`
+            );
+        }
+        
+        // Format specifier count check
+        if (formatArgNode.type === 'string_literal') {
+            const formatSpecifiers = formatString.match(/%[sdioxXufeEgGaAcsp]/g);
+            const specifierCount = formatSpecifiers ? formatSpecifiers.length : 0;
+            const expectedArgCount = args.length - formatArgIndex - 1;
+
+            if (specifierCount > expectedArgCount) {
+                issues.push(
+                    `Warning: Format string at line ${line} in method "${methodName}" has more format specifiers (${specifierCount}) than arguments (${expectedArgCount}), which can lead to undefined behavior or crashes.`
+                );
+            }
+        }
+    }
+}
+
                         
                         // 8. Weak Crypto Check in function calls
                         const cryptoAlgo = containsWeakCrypto(fnName);
