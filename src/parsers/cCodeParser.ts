@@ -113,3 +113,4 @@ function logParsedFunction(func: {
     outputChannel.appendLine(`    Function Body:\n${func.functionBody}`);
     outputChannel.appendLine("───────────────────────────────────────────────"); // Separator for readability
 }
+//1020
