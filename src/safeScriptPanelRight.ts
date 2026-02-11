@@ -55,6 +55,14 @@ export class SafeScriptPanelRight {
                         prompt: message.prompt
                     });
                     break;
+                case 'insertCode':
+                    // Execute the insert command with security check
+                    vscode.commands.executeCommand(
+                        'extension.insertCodeWithSecurityCheck',
+                        message.code,
+                        message.issueCount
+                    );
+                    break;
                 case 'improvedCodeGenerated':
                     // Add improved code to the AI Suggestion History
                     if (SafeScriptPanelRight.aiSuggestionHistoryProvider) {
@@ -320,9 +328,9 @@ export class SafeScriptPanelRight {
 </head>
 <body>
   <div class="toggle-container">
-    <div id="analyzeToggle" class="toggle-option active">Analyze & Improve</div>
-    <div id="generateToggle" class="toggle-option">Generate Code</div>
-  </div>
+    <div id="analyzeToggle" class="toggle-option">Analyze & Improve</div>
+    <div id="generateToggle" class="toggle-option active">Generate Code <span class="ai-badge">DeepSeek</span></div>
+</div>
 
   <div id="statusIndicator" style="visibility: hidden;"></div>
   
@@ -330,17 +338,17 @@ export class SafeScriptPanelRight {
     <div class="empty-state">
       <div class="empty-state-icon">💻</div>
       <h3>Welcome to SafeScript</h3>
-      <p id="emptyStateText">Enter C code below to analyze and improve security.</p>
+      <p id="emptyStateText">Describe the C code you want to generate.</p>
     </div>
   </div>
   
   <div id="inputContainer" class="card">
-    <textarea id="messageInput" placeholder="Enter your C code here..."></textarea>
+    <textarea id="messageInput" placeholder="Describe the C code you want to generate..."></textarea>
     <div id="error-message" class="error-message">Invalid C code. Please check syntax.</div>
     <div id="buttonContainer">
-      <div id="inputInfo" class="c-code-info">Enter valid C code for best results</div>
+      <div id="inputInfo" class="c-code-info">Be specific about the functionality you need</div>
       <button id="clearButton" class="button">Clear</button>
-      <button id="sendButton" class="button">Analyze & Improve</button>
+      <button id="sendButton" class="button">Generate Code</button>
     </div>
   </div>
   
@@ -350,7 +358,8 @@ export class SafeScriptPanelRight {
     let isProcessing = false;
     let currentUserCode = "";
     let currentImprovedCode = "";
-    let isGenerateMode = false;
+    let isGenerateMode = true;
+    let currentIssueCount = 0;
     
     const issuesContainer = document.getElementById('issuesContainer');
     const statusIndicator = document.getElementById('statusIndicator');
@@ -405,8 +414,18 @@ export class SafeScriptPanelRight {
       
       if (message.command === 'updateIssues') {
         detectedIssues = message.issues || "No security issues detected.";
-        issuesContainer.textContent = detectedIssues;
-      }
+        
+        // Count the number of issues
+        if (detectedIssues === "No security issues detected.") {
+            currentIssueCount = 0;
+        } else {
+            currentIssueCount = (detectedIssues.match(/Warning:/g) || []).length;
+        }
+        
+        if (issuesContainer) {
+            issuesContainer.textContent = detectedIssues;
+        }
+    }
       
       if (message.command === 'analysisStatus') {
         statusIndicator.style.display = 'block';
@@ -432,95 +451,149 @@ export class SafeScriptPanelRight {
     });
 
     function appendBubble(type, text, showActions = false, isGenerated = false) {
-      if (emptyState && !emptyState.classList.contains('hidden')) {
-        emptyState.classList.add('hidden');
-      }
-      
-      const wrapper = document.createElement('div');
-      wrapper.style.display = 'flex';
-      wrapper.style.flexDirection = 'column';
-      wrapper.style.alignSelf = type === 'user' ? 'flex-end' : 'flex-start';
-      wrapper.style.maxWidth = '80%';
-      
-      const bubble = document.createElement('div');
-      bubble.classList.add('bubble', type);
-      bubble.textContent = text;
-      wrapper.appendChild(bubble);
-      
-      // Only show "Add to Suggestion History" button for improved code (not generated code)
-      if (showActions && type === 'bot' && !isGenerated) {
-        const actionButtons = document.createElement('div');
-        actionButtons.classList.add('action-buttons');
-        
-        const addToHistoryBtn = document.createElement('button');
-        addToHistoryBtn.classList.add('action-button', 'primary');
-        addToHistoryBtn.textContent = 'Add to Suggestion History';
-        addToHistoryBtn.addEventListener('click', () => {
-          // Send improved code to extension to add to history
-          vscode.postMessage({
-            command: 'improvedCodeGenerated',
-            improvedCode: text,
-            originalCode: currentUserCode
-          });
-          addToHistoryBtn.disabled = true;
-          addToHistoryBtn.textContent = 'Added to History';
-        });
-        
-        const copyBtn = document.createElement('button');
-        copyBtn.classList.add('action-button');
-        copyBtn.textContent = 'Copy Code';
-        copyBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText(text).then(() => {
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => {
-              copyBtn.textContent = 'Copy Code';
-            }, 2000);
-          });
-        });
-        
-        // Only add the "Add to Suggestion History" button for improved code
-        if (!isGenerated) {
-          actionButtons.appendChild(addToHistoryBtn);
-        }
-        actionButtons.appendChild(copyBtn);
-        wrapper.appendChild(actionButtons);
-      } else if (showActions && type === 'bot' && isGenerated) {
-        // For generated code, only show the copy button
-        const actionButtons = document.createElement('div');
-        actionButtons.classList.add('action-buttons');
-        
-        const copyBtn = document.createElement('button');
-        copyBtn.classList.add('action-button');
-        copyBtn.textContent = 'Copy Code';
-        copyBtn.addEventListener('click', () => {
-          navigator.clipboard.writeText(text).then(() => {
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => {
-              copyBtn.textContent = 'Copy Code';
-            }, 2000);
-          });
-        });
-        
-        const analyzeBtn = document.createElement('button');
-        analyzeBtn.classList.add('action-button', 'primary');
-        analyzeBtn.textContent = 'Analyze This Code';
-        analyzeBtn.addEventListener('click', () => {
-          switchToAnalyzeMode();
-          messageInput.value = text;
-          // Focus on the send button to encourage user to click it
-          sendButton.focus();
-        });
-        
-        actionButtons.appendChild(analyzeBtn);
-        actionButtons.appendChild(copyBtn);
-        wrapper.appendChild(actionButtons);
-      }
-      
-      chatContainer.appendChild(wrapper);
-      chatContainer.scrollTop = chatContainer.scrollHeight;
-      return bubble;
-    }
+  if (emptyState && !emptyState.classList.contains('hidden')) {
+    emptyState.classList.add('hidden');
+  }
+  
+  const wrapper = document.createElement('div');
+  wrapper.style.display = 'flex';
+  wrapper.style.flexDirection = 'column';
+  wrapper.style.alignSelf = type === 'user' ? 'flex-end' : 'flex-start';
+  wrapper.style.maxWidth = '80%';
+  
+  const bubble = document.createElement('div');
+  bubble.classList.add('bubble', type);
+  bubble.textContent = text;
+  wrapper.appendChild(bubble);
+  
+  // Only show "Add to Suggestion History" button for improved code (not generated code)
+  if (showActions && type === 'bot' && !isGenerated) {
+    const actionButtons = document.createElement('div');
+    actionButtons.classList.add('action-buttons');
     
+    const addToHistoryBtn = document.createElement('button');
+    addToHistoryBtn.classList.add('action-button', 'primary');
+    addToHistoryBtn.textContent = 'Add to Suggestion History';
+    addToHistoryBtn.addEventListener('click', () => {
+      // Send improved code to extension to add to history
+      vscode.postMessage({
+        command: 'improvedCodeGenerated',
+        improvedCode: text,
+        originalCode: currentUserCode
+      });
+      addToHistoryBtn.disabled = true;
+      addToHistoryBtn.textContent = 'Added to History';
+    });
+    
+    // Insert button for improved code
+    const insertBtn = document.createElement('button');
+    insertBtn.classList.add('action-button', 'primary');
+    insertBtn.textContent = '📥 Insert in Editor';
+    insertBtn.addEventListener('click', () => {
+      vscode.postMessage({
+        command: 'insertCode',
+        code: text,
+        issueCount: currentIssueCount
+      });
+    });
+    
+    const copyBtn = document.createElement('button');
+    copyBtn.classList.add('action-button');
+    copyBtn.textContent = 'Copy Code';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy Code';
+        }, 2000);
+      });
+    });
+    
+    // Only add the "Add to Suggestion History" button for improved code
+    if (!isGenerated) {
+      actionButtons.appendChild(addToHistoryBtn);
+    }
+    actionButtons.appendChild(insertBtn);
+    actionButtons.appendChild(copyBtn);
+    wrapper.appendChild(actionButtons);
+  } else if (showActions && type === 'bot' && isGenerated) {
+    // For generated code, show analyze, insert, and copy buttons
+    const actionButtons = document.createElement('div');
+    actionButtons.classList.add('action-buttons');
+
+
+
+
+    
+    const analyzeBtn = document.createElement('button');
+    analyzeBtn.classList.add('action-button', 'primary');
+    analyzeBtn.textContent = 'Analyze This Code';
+    analyzeBtn.addEventListener('click', () => {
+      // Switch to analyze mode
+      switchToAnalyzeMode();
+      
+      // Store the code and immediately analyze it
+      currentUserCode = text;
+      
+      // Show user message bubble
+      appendBubble('user', text);
+      
+      // Show analyzing status
+      appendBubble('status', '🔍 Analyzing code...');
+      
+      // Send to VSCode extension for analysis
+      vscode.postMessage({
+        command: 'analyzeCode',
+        code: text
+      });
+      
+      isProcessing = true;
+      sendButton.disabled = true;
+    });
+
+
+    
+    // Insert button for generated code
+    const insertBtn = document.createElement('button');
+    insertBtn.classList.add('action-button', 'primary');
+    insertBtn.textContent = '📥 Insert in Editor';
+    insertBtn.addEventListener('click', () => {
+      vscode.postMessage({
+        command: 'insertCode',
+        code: text,
+        issueCount: currentIssueCount
+      });
+    });
+    
+    const copyBtn = document.createElement('button');
+    copyBtn.classList.add('action-button');
+    copyBtn.textContent = 'Copy Code';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy Code';
+        }, 2000);
+      });
+    });
+    
+    actionButtons.appendChild(analyzeBtn);
+    actionButtons.appendChild(insertBtn);
+    actionButtons.appendChild(copyBtn);
+    wrapper.appendChild(actionButtons);
+  }
+  
+  chatContainer.appendChild(wrapper);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+  return bubble;
+}
+    
+
+
+
+
+
+
     function removeLastBubbleIfLoading() {
       const statusBubbles = chatContainer.querySelectorAll('.bubble.status');
       if (statusBubbles.length > 0) {
@@ -652,7 +725,7 @@ export class SafeScriptPanelRight {
             messages: [
               {
                 role: 'system',
-                content: 'Generate the entire function of C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code.'
+                content: 'Generate ONLY C code based on the following description. Intentionally include 1-2 subtle security vulnerabilities (such as buffer overflow, use of unsafe functions like strcpy/sprintf/gets, format string issues, or missing input validation) so the user can practice identifying and fixing them. Do NOT mention or comment about the vulnerabilities in the code. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code. Write only pure C code.'
               },
               {
                 role: 'user',

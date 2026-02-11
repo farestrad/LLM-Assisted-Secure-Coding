@@ -162,6 +162,125 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // ----------------------------
+    // Command: Show Detail Panel (for security issues, CWEs, CVEs)
+    // ----------------------------
+    vscode.commands.registerCommand('extension.showDetailPanel', (title: string, content: string, type: 'issue' | 'cwe' | 'cve') => {
+        const panel = vscode.window.createWebviewPanel(
+            'safescriptDetail',
+            title,
+            vscode.ViewColumn.Beside,
+            { enableScripts: true }
+        );
+
+        // Different styling based on type
+        const iconMap = {
+            'issue': '⚠️',
+            'cwe': '🛡️',
+            'cve': '🔓'
+        };
+        
+        const colorMap = {
+            'issue': '#f14c4c',
+            'cwe': '#3794ff',
+            'cve': '#ce9178'
+        };
+
+        panel.webview.html = `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${title}</title>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                padding: 20px;
+                background: #1e1e1e;
+                color: #cccccc;
+                line-height: 1.6;
+            }
+            .header {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 20px;
+                padding-bottom: 15px;
+                border-bottom: 1px solid #3d3d3d;
+            }
+            .icon {
+                font-size: 32px;
+            }
+            .title {
+                color: ${colorMap[type]};
+                font-size: 18px;
+                font-weight: 600;
+                margin: 0;
+            }
+            .content {
+                background: #252526;
+                padding: 16px;
+                border-radius: 6px;
+                border-left: 4px solid ${colorMap[type]};
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            .actions {
+                margin-top: 20px;
+                display: flex;
+                gap: 10px;
+            }
+            button {
+                background: #0e639c;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 13px;
+            }
+            button:hover {
+                background: #1177bb;
+            }
+            button.secondary {
+                background: transparent;
+                border: 1px solid #3d3d3d;
+                color: #cccccc;
+            }
+            button.secondary:hover {
+                background: rgba(255,255,255,0.1);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <span class="icon">${iconMap[type]}</span>
+            <h1 class="title">${title}</h1>
+        </div>
+        <div class="content">${content}</div>
+        <div class="actions">
+            <button onclick="copyContent()">📋 Copy to Clipboard</button>
+            <button class="secondary" onclick="closePanel()">Close</button>
+        </div>
+        <script>
+            const vscode = acquireVsCodeApi();
+            function copyContent() {
+                navigator.clipboard.writeText(\`${content.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`);
+                const btn = document.querySelector('button');
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => btn.textContent = '📋 Copy to Clipboard', 2000);
+            }
+            function closePanel() {
+                vscode.postMessage({ command: 'close' });
+            }
+        </script>
+    </body>
+    </html>`;
+    });
+
+
+    
+
+    // ----------------------------
     // Command: Generate Code with Code Llama
     // ----------------------------
     const disposable = vscode.commands.registerCommand('codeLlama.runCodeLlama', async () => {
@@ -201,7 +320,8 @@ export function activate(context: vscode.ExtensionContext) {
                     messages: [
                         {
                             role: 'system',
-                            content: 'Generate ONLY C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code. Write only pure C code.'
+                            content: 'Generate ONLY C code based on the following description. Intentionally include 1-2 subtle security vulnerabilities (such as buffer overflow, use of unsafe functions like strcpy/sprintf/gets, format string issues, or missing input validation) so the user can practice identifying and fixing them. Do NOT mention or comment about the vulnerabilities in the code. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code. Write only pure C code.'
+                            //content: 'Generate ONLY C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code. Write only pure C code.'
                         },
                         {
                             role: 'user',
@@ -370,128 +490,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }
     });
-
-
-
-    // ----------------------------
-// Command: Show Detail Panel (for security issues, CWEs, CVEs)
-// ----------------------------
-vscode.commands.registerCommand('extension.showDetailPanel', (title: string, content: string, type: 'issue' | 'cwe' | 'cve') => {
-    const panel = vscode.window.createWebviewPanel(
-        'safescriptDetail',
-        title,
-        vscode.ViewColumn.Beside,
-        { enableScripts: true }
-    );
-
-    // Different styling based on type
-    const iconMap = {
-        'issue': '⚠️',
-        'cwe': '🛡️',
-        'cve': '🔓'
-    };
     
-    const colorMap = {
-        'issue': '#f14c4c',
-        'cwe': '#3794ff',
-        'cve': '#ce9178'
-    };
-
-    panel.webview.html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title}</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            padding: 20px;
-            background: #1e1e1e;
-            color: #cccccc;
-            line-height: 1.6;
-        }
-        .header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #3d3d3d;
-        }
-        .icon {
-            font-size: 32px;
-        }
-        .title {
-            color: ${colorMap[type]};
-            font-size: 18px;
-            font-weight: 600;
-            margin: 0;
-        }
-        .content {
-            background: #252526;
-            padding: 16px;
-            border-radius: 6px;
-            border-left: 4px solid ${colorMap[type]};
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        .actions {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-        }
-        button {
-            background: #0e639c;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        button:hover {
-            background: #1177bb;
-        }
-        button.secondary {
-            background: transparent;
-            border: 1px solid #3d3d3d;
-            color: #cccccc;
-        }
-        button.secondary:hover {
-            background: rgba(255,255,255,0.1);
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <span class="icon">${iconMap[type]}</span>
-        <h1 class="title">${title}</h1>
-    </div>
-    <div class="content">${content}</div>
-    <div class="actions">
-        <button onclick="copyContent()">📋 Copy to Clipboard</button>
-        <button class="secondary" onclick="closePanel()">Close</button>
-    </div>
-    <script>
-        const vscode = acquireVsCodeApi();
-        function copyContent() {
-            navigator.clipboard.writeText(\`${content.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`);
-            const btn = document.querySelector('button');
-            btn.textContent = '✓ Copied!';
-            setTimeout(() => btn.textContent = '📋 Copy to Clipboard', 2000);
-        }
-        function closePanel() {
-            vscode.postMessage({ command: 'close' });
-        }
-    </script>
-</body>
-</html>`;
-});
-
-
-
-
 }
 
 // Deactivate function
