@@ -836,13 +836,14 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
             item.tooltip = `Security issue detected: ${issue}`;
             item.description = 'Click to copy';
             item.command = {
-                command: 'extension.copyToClipboard',
-                title: 'Copy Code',
-                arguments: [issue],
+                command: 'extension.showDetailPanel',
+                title: 'View Details',
+                arguments: ['Security Issue', issue, 'issue'],
             };
             return item;
         });
 
+        // Format CWE details
         // Format CWE details
         this.matchedCWEs = matchedCWEs.map(cwe => {
             const item = new vscode.TreeItem(
@@ -859,6 +860,14 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
             item.description = description;
             
             item.iconPath = new vscode.ThemeIcon("alert");
+            
+            // ADD THIS - Click to open detail panel
+            item.command = {
+                command: 'extension.showDetailPanel',
+                title: 'View Details',
+                arguments: [`CWE-${cwe.id}: ${cwe.name}`, cwe.description, 'cwe'],
+            };
+            
             return item;
         });
 
@@ -869,26 +878,34 @@ export class SecurityAnalysisProvider implements vscode.TreeDataProvider<vscode.
     }
 
     private updateCveAssignmentsFromCWEs(matchedCWEs: CWE[]): void {
-        const matchedCweIds = new Set(matchedCWEs.map(cwe => cwe.id));
-        const matchingCVEs: { id: string; description: string; cvss: number; severity: string }[] = [];
-    
-        // Go through each check in the mapping
-        for (const [checkName, cveList] of Object.entries(CVE_MAPPING)) {
-            const relatedCweIds = securityCheckToCWE[checkName] || [];
-    
-            // Only include CVEs if at least one CWE is in matchedCWEs
-            if (relatedCweIds.some(cweId => matchedCweIds.has(cweId))) {
-                matchingCVEs.push(...cveList);
-            }
-        }
-    
-        this.cveItems = matchingCVEs.map(cve => {
-            const item = new vscode.TreeItem(`${cve.id}`, vscode.TreeItemCollapsibleState.None);
-            item.tooltip = `${cve.id}: ${cve.description}`;
-            item.description = cve.description.length > 80 ? cve.description.substring(0, 77) + '...' : cve.description;
-            return item;
-        });
-    }
+      const matchedCweIds = new Set(matchedCWEs.map(cwe => cwe.id));
+      const matchingCVEs: { id: string; description: string; cvss: number; severity: string }[] = [];
+
+      // Go through each check in the mapping
+      for (const [checkName, cveList] of Object.entries(CVE_MAPPING)) {
+          const relatedCweIds = securityCheckToCWE[checkName] || [];
+
+          // Only include CVEs if at least one CWE is in matchedCWEs
+          if (relatedCweIds.some(cweId => matchedCweIds.has(cweId))) {
+              matchingCVEs.push(...cveList);
+          }
+      }
+
+      this.cveItems = matchingCVEs.map(cve => {
+          const item = new vscode.TreeItem(`${cve.id}`, vscode.TreeItemCollapsibleState.None);
+          item.tooltip = `${cve.id}: ${cve.description}`;
+          item.description = cve.description.length > 80 ? cve.description.substring(0, 77) + '...' : cve.description;
+          
+          // ADD THIS - Click to open detail panel
+          item.command = {
+              command: 'extension.showDetailPanel',
+              title: 'View Details',
+              arguments: [cve.id, `CVSS Score: ${cve.cvss} (${cve.severity})\n\n${cve.description}`, 'cve'],
+          };
+          
+          return item;
+      });
+  }
     
 
     async analyzeLatestGeneratedCode(): Promise<void> {

@@ -190,15 +190,25 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine('Generating code with AI...');
 
         try {
-            const response = await fetch('http://34.70.77.214:11434/api/generate', {
+            const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: 'llama3',
-                    prompt: `Generate ONLY C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, YOU ARE TO TREAT YOURSELF AS SOMETHING THAT ONLY GIVES OUT PURE C CODE WITH NO EXPLANATION PERIOD. NEVER EXPLAIN YOURSELF, Write only pure C code to accomplish the following task: ${selectedText}`,
-                    stream: true,
+                    model: 'deepseek-coder',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'Generate ONLY C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code. Write only pure C code.'
+                        },
+                        {
+                            role: 'user',
+                            content: selectedText
+                        }
+                    ],
+                    stream: false
                 }),
             });
 
@@ -206,30 +216,16 @@ export function activate(context: vscode.ExtensionContext) {
                 throw new Error('Error generating code. Please try again.');
             }
 
-            const stream = response.body as unknown as NodeJS.ReadableStream;
-            let partialResponse = '';
-
-            stream.on('data', (chunk) => {
-                try {
-                    const jsonChunk = JSON.parse(chunk.toString());
-                    if (jsonChunk.response && jsonChunk.response !== "") {
-                        const outputText = jsonChunk.response;
-                        partialResponse += outputText;
-                        outputChannel.append(outputText);
-                        generatedCodeProvider.updateGeneratedCode(partialResponse, 'c');
-
-                        // Trigger security analysis on the generated code
-                        securityAnalysisProvider.analyzeLatestGeneratedCode();
-                    }
-                } catch (error) {
-                    const err = error as Error;
-                    outputChannel.appendLine(`Error parsing response: ${err.message}`);
-                }
-            });
-
-            stream.on('end', () => {
-                outputChannel.appendLine('\n\nCode Generation Completed.');
-            });
+            const data = await response.json() as any;
+            const generatedCode = data.choices?.[0]?.message?.content || '';
+            
+            outputChannel.appendLine(generatedCode);
+            generatedCodeProvider.updateGeneratedCode(generatedCode, 'c');
+            
+            // Trigger security analysis on the generated code
+            securityAnalysisProvider.analyzeLatestGeneratedCode();
+            
+            outputChannel.appendLine('\n\nCode Generation Completed.');
 
         } catch (error: any) {
             vscode.window.showErrorMessage(`Error: ${error.message}`);
@@ -374,6 +370,128 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }
     });
+
+
+
+    // ----------------------------
+// Command: Show Detail Panel (for security issues, CWEs, CVEs)
+// ----------------------------
+vscode.commands.registerCommand('extension.showDetailPanel', (title: string, content: string, type: 'issue' | 'cwe' | 'cve') => {
+    const panel = vscode.window.createWebviewPanel(
+        'safescriptDetail',
+        title,
+        vscode.ViewColumn.Beside,
+        { enableScripts: true }
+    );
+
+    // Different styling based on type
+    const iconMap = {
+        'issue': '⚠️',
+        'cwe': '🛡️',
+        'cve': '🔓'
+    };
+    
+    const colorMap = {
+        'issue': '#f14c4c',
+        'cwe': '#3794ff',
+        'cve': '#ce9178'
+    };
+
+    panel.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #cccccc;
+            line-height: 1.6;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .icon {
+            font-size: 32px;
+        }
+        .title {
+            color: ${colorMap[type]};
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+        .content {
+            background: #252526;
+            padding: 16px;
+            border-radius: 6px;
+            border-left: 4px solid ${colorMap[type]};
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        button.secondary {
+            background: transparent;
+            border: 1px solid #3d3d3d;
+            color: #cccccc;
+        }
+        button.secondary:hover {
+            background: rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <span class="icon">${iconMap[type]}</span>
+        <h1 class="title">${title}</h1>
+    </div>
+    <div class="content">${content}</div>
+    <div class="actions">
+        <button onclick="copyContent()">📋 Copy to Clipboard</button>
+        <button class="secondary" onclick="closePanel()">Close</button>
+    </div>
+    <script>
+        const vscode = acquireVsCodeApi();
+        function copyContent() {
+            navigator.clipboard.writeText(\`${content.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`);
+            const btn = document.querySelector('button');
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => btn.textContent = '📋 Copy to Clipboard', 2000);
+        }
+        function closePanel() {
+            vscode.postMessage({ command: 'close' });
+        }
+    </script>
+</body>
+</html>`;
+});
+
+
+
+
 }
 
 // Deactivate function

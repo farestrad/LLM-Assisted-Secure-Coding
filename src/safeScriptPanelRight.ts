@@ -592,36 +592,40 @@ export class SafeScriptPanelRight {
     
     async function generateImprovedCode() {
       removeLastBubbleIfLoading();
-      appendBubble('status', '✨ Generating improved code...');
+      appendBubble('status', '✨ Generating improved code with DeepSeek...');
       
       try {
-        const response = await fetch('http://34.70.77.214:11434/api/generate', {
+        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${process.env.DEEPSEEK_API_KEY}'
+          },
           body: JSON.stringify({ 
-            model: 'llama3', 
-            prompt: \`Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code. Write the C code to accomplish the following task: Improve the following C code to address these security issues:
- Security Issues:
-  \${detectedIssues}
-
-  Function Code:
- \${currentUserCode}\`, 
-            stream: false 
-          }),
-          timeout: 1000
+            model: 'deepseek-coder',
+            messages: [
+              {
+                role: 'system',
+                content: 'Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code.'
+              },
+              {
+                role: 'user',
+                content: \`Improve the following C code to address these security issues:
+    Security Issues: \${detectedIssues}
+    Function Code: \${currentUserCode}\`
+              }
+            ]
+          })
         });
         
         if (!response.ok) { 
           throw new Error('Error generating improved code'); 
         }
         
-        const jsonReply = await response.json();
+        const data = await response.json();
         removeLastBubbleIfLoading();
         
-        // Store the improved code
-        currentImprovedCode = jsonReply.response || 'No reply received';
-        
-        // Add the bot bubble with action buttons
+        currentImprovedCode = data.choices?.[0]?.message?.content || 'No reply received';
         appendBubble('bot', currentImprovedCode, true, false);
       } catch (error) {
         removeLastBubbleIfLoading();
@@ -634,33 +638,38 @@ export class SafeScriptPanelRight {
     
     async function generateNewCode(prompt) {
       removeLastBubbleIfLoading();
-      appendBubble('status', '✏️ Generating C code from prompt...');
+      appendBubble('status', '✏️ Generating C code with DeepSeek...');
       
       try {
-        const response = await fetch('http://34.70.77.214:11434/api/generate', {
+        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${process.env.DEEPSEEK_API_KEY}'
+          },
           body: JSON.stringify({ 
-            model: 'llama3', 
-            prompt: \`Generate the entire function of C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code:
-            
-  \${prompt}\`, 
-            stream: false 
-          }),
-          timeout: 1000
+            model: 'deepseek-coder',
+            messages: [
+              {
+                role: 'system',
+                content: 'Generate the entire function of C code based on the following description. Only provide the C code with no additional explanation, comments, NO extra text, and do not write the letter c on top, do not generate backticks on top or below the c code, just output pure c code.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ]
+          })
         });
         
         if (!response.ok) { 
           throw new Error('Error generating code'); 
         }
         
-        const jsonReply = await response.json();
+        const data = await response.json();
         removeLastBubbleIfLoading();
         
-        // Generated code (not improved)
-        const generatedCode = jsonReply.response || 'No reply received';
-        
-        // Add the bot bubble with only a copy button (not added to history)
+        const generatedCode = data.choices?.[0]?.message?.content || 'No reply received';
         appendBubble('bot', generatedCode, true, true);
       } catch (error) {
         removeLastBubbleIfLoading();

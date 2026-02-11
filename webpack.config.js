@@ -46,6 +46,7 @@ const extensionConfig = {
   plugins: [
     new webpack.DefinePlugin({
       'process.env.AMPLITUDE_API_KEY': JSON.stringify(process.env.AMPLITUDE_API_KEY),
+      'process.env.DEEPSEEK_API_KEY': JSON.stringify(process.env.DEEPSEEK_API_KEY),
     }),
     // Prevent chunk splitting to keep all your code in one bundle
     new webpack.optimize.LimitChunkCountPlugin({
